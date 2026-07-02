@@ -195,7 +195,7 @@ export const createParentChild = createServerFn({ method: "POST" })
     const child = await withRetry(async () => {
       const { data: row, error } = await supabaseAdmin
         .from("users")
-        .update({ parent_id: parentId, name, is_minor: true, role: "child", date_of_birth: input.dob } as any)
+        .update({ parent_id: parentId, name, is_minor: true, role: "child", date_of_birth: data.dob } as any)
         .eq("id", childUser.id)
         .select("id,name,email,created_at")
         .single();
