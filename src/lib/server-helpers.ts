@@ -60,7 +60,18 @@ async function requireRole(accessToken: string, role: AppRole) {
 
   const authData = await withRetry(async () => {
     const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
-    if (error || !data.user) throw new Error(extractMessage(error, "Session could not be verified."));
+    if (error || !data.user) {
+      const msg = extractMessage(error, "Session could not be verified.");
+      const isExpired =
+        msg.includes("Auth session missing") ||
+        msg.includes("invalid JWT") ||
+        msg.includes("JWT expired") ||
+        msg.includes("token is expired") ||
+        (error as any)?.status === 401;
+      const err = new Error(isExpired ? "Your session has expired. Please sign in again." : msg);
+      if (isExpired) (err as any).code = "AUTH_EXPIRED";
+      throw err;
+    }
     return data;
   }, "verify your session");
 

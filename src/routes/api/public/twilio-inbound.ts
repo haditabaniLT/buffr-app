@@ -96,7 +96,7 @@ export const Route = createFileRoute("/api/public/twilio-inbound")({
         if (HELP_KEYWORDS.has(rawBody)) {
           return twiml(
             "Buffr: Alerts for risky financial activity on linked accounts. " +
-            "Support: support@usebuffr.com | usebuffr.com/privacy. " +
+            "Support: support@buffr.app | buffr.app/privacy. " +
             "Msg&data rates may apply. Reply STOP to opt out.",
           );
         }

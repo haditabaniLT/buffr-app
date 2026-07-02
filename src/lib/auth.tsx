@@ -14,6 +14,8 @@ export type Profile = {
   avatar_url: string | null;
   parent_id: string | null;
   is_minor: boolean;
+  role?: "admin" | "parent" | "child";
+  date_of_birth?: string | null;
   sms_opted_out?: boolean;
   status?: "active" | "suspended" | "blocked";
 };
@@ -153,6 +155,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "[auth] server snapshot returned transient state, falling back to client queries",
         );
       } catch (e) {
+        if (
+          (e as any)?.code === "AUTH_EXPIRED" ||
+          (e as Error)?.message?.includes("Auth session missing") ||
+          (e as Error)?.message?.includes("session has expired")
+        ) {
+          clearCache();
+          setProfile(null); setRole(null); setUser(null); setSession(null);
+          lastFetchedUid.current = null;
+          await supabase.auth.signOut();
+          return null;
+        }
         console.error("[auth] server auth snapshot failed, falling back to client queries:", e);
       }
     }

@@ -191,36 +191,11 @@ export const createParentChild = createServerFn({ method: "POST" })
       return created.user;
     }, "create the child account");
 
-    // Explicitly enforce child role — do NOT rely solely on handle_new_user.
-    // Some Supabase GoTrue versions don't pass app_metadata to the trigger at
-    // INSERT time, causing it to default to 'parent'. We fix it unconditionally.
-    await withRetry(async () => {
-      const { data: childRole, error: roleErr } = await supabaseAdmin
-        .from("roles")
-        .select("id")
-        .ilike("name", "child")
-        .single();
-      if (roleErr || !childRole) throw new Error("Child role not found.");
-
-      // Strip any wrong roles the trigger may have assigned
-      await supabaseAdmin
-        .from("user_roles")
-        .delete()
-        .eq("user_id", childUser.id)
-        .neq("role_id", childRole.id);
-
-      // Ensure the child role row exists
-      const { error: upsertErr } = await supabaseAdmin
-        .from("user_roles")
-        .upsert({ user_id: childUser.id, role_id: childRole.id }, { onConflict: "user_id,role_id" });
-      if (upsertErr) throw upsertErr;
-    }, "enforce child role");
-
-    // Link the new child profile to this parent and mark as minor.
+    // Link the child profile to this parent, enforce child role, and mark as minor.
     const child = await withRetry(async () => {
       const { data: row, error } = await supabaseAdmin
         .from("users")
-        .update({ parent_id: parentId, name, is_minor: true })
+        .update({ parent_id: parentId, name, is_minor: true, role: "child", date_of_birth: input.dob } as any)
         .eq("id", childUser.id)
         .select("id,name,email,created_at")
         .single();

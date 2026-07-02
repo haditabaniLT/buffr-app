@@ -58,7 +58,7 @@ function PrivacyPolicy() {
           </li>
           <li>
             <strong>Help:</strong> reply <strong>HELP</strong> to any Buffr SMS or email{" "}
-            <a href="mailto:support@usebuffr.com">support@usebuffr.com</a>.
+            <a href="mailto:support@buffr.app">support@buffr.app</a>.
           </li>
           <li>
             Your phone number is used exclusively for Buffr alert messages. We do not sell or share
@@ -90,7 +90,7 @@ function PrivacyPolicy() {
         <p>
           We retain account data for as long as your account is active. Flagged transaction records
           are retained for 24 months. You may request deletion of your account by contacting{" "}
-          <a href="mailto:support@usebuffr.com">support@usebuffr.com</a>.
+          <a href="mailto:support@buffr.app">support@buffr.app</a>.
         </p>
 
         <h2>7. Security</h2>
@@ -109,7 +109,7 @@ function PrivacyPolicy() {
         <h2>9. Your Rights</h2>
         <p>
           Depending on your location you may have rights to access, correct, or delete your
-          personal data. Contact us at <a href="mailto:support@usebuffr.com">support@usebuffr.com</a> to
+          personal data. Contact us at <a href="mailto:support@buffr.app">support@buffr.app</a> to
           exercise these rights.
         </p>
 
@@ -123,8 +123,8 @@ function PrivacyPolicy() {
         <h2>11. Contact Us</h2>
         <p>
           Buffr<br />
-          Email: <a href="mailto:support@usebuffr.com">support@usebuffr.com</a><br />
-          Website: <a href="https://usebuffr.com">usebuffr.com</a>
+          Email: <a href="mailto:support@buffr.app">support@buffr.app</a><br />
+          Website: <a href="https://buffr.app">buffr.app</a>
         </p>
       </main>
 
