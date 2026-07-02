@@ -66,7 +66,7 @@ function Landing() {
         <div className="flex gap-4">
           <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
           <Link to="/terms" className="hover:underline">Terms of Service</Link>
-          <a href="mailto:support@buffr.app" className="hover:underline">Contact</a>
+          <a href="mailto:support@usebuffr.com" className="hover:underline">Contact</a>
         </div>
       </footer>
     </div>

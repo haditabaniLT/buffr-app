@@ -83,7 +83,7 @@ export const mockUsers: User[] = [
   {
     id: "u_parent",
     name: "Sarah Mitchell",
-    email: "parent@buffr.app",
+    email: "parent@usebuffr.com",
     role: "parent",
     status: "active",
     createdAt: "2024-09-01",
@@ -92,7 +92,7 @@ export const mockUsers: User[] = [
   {
     id: "u_student",
     name: "Jamie Mitchell",
-    email: "student@buffr.app",
+    email: "student@usebuffr.com",
     role: "child",
     status: "active",
     createdAt: "2024-09-02",
@@ -102,7 +102,7 @@ export const mockUsers: User[] = [
   {
     id: "u_admin",
     name: "Admin User",
-    email: "admin@buffr.app",
+    email: "admin@usebuffr.com",
     role: "admin",
     status: "active",
     createdAt: "2024-08-01",

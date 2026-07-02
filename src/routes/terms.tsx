@@ -59,7 +59,7 @@ function TermsOfService() {
           <li>Consent to receive SMS is not a condition of using the Buffr platform.</li>
           <li>
             For help, reply <strong>HELP</strong> or contact{" "}
-            <a href="mailto:support@buffr.app">support@buffr.app</a>.
+            <a href="mailto:support@usebuffr.com">support@usebuffr.com</a>.
           </li>
         </ul>
 
@@ -106,7 +106,7 @@ function TermsOfService() {
         <h2>11. Contact</h2>
         <p>
           Buffr<br />
-          Email: <a href="mailto:support@buffr.app">support@buffr.app</a>
+          Email: <a href="mailto:support@usebuffr.com">support@usebuffr.com</a>
         </p>
       </main>
 
