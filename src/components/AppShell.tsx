@@ -17,6 +17,7 @@ const navByRole = {
     { to: "/student", label: "Dashboard" },
     { to: "/student/accounts", label: "Bank Accounts" },
     { to: "/student/settings", label: "Settings" },
+    { to: "/parent/simulate", label: "Simulate" },
   ],
   admin: [
     { to: "/admin", label: "Overview" },

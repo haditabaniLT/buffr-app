@@ -10,6 +10,7 @@ import {
   exchangePlaidPublicToken,
   assignBankAccountOwner,
 } from "@/lib/plaid-server";
+import { listParentTransactions, type TxRow } from "@/lib/transactions-server";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,17 +46,19 @@ function calcAge(dob: string): number {
 }
 
 function ParentChild() {
-  const { currentUser, transactions, connectBank } = useStore();
+  const { currentUser } = useStore();
   const { session } = useAuth();
-  const getParentChildrenFn = useServerFn(getParentChildren);
-  const createParentChildFn = useServerFn(createParentChild);
-  const createLinkTokenFn   = useServerFn(createPlaidLinkToken);
-  const exchangeFn          = useServerFn(exchangePlaidPublicToken);
-  const assignFn            = useServerFn(assignBankAccountOwner);
+  const getParentChildrenFn   = useServerFn(getParentChildren);
+  const createParentChildFn   = useServerFn(createParentChild);
+  const createLinkTokenFn     = useServerFn(createPlaidLinkToken);
+  const exchangeFn            = useServerFn(exchangePlaidPublicToken);
+  const assignFn              = useServerFn(assignBankAccountOwner);
+  const listTransactionsFn    = useServerFn(listParentTransactions);
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"form" | "invited" | "connect" | "done">("form");
   const [children, setChildren] = useState<ParentChildRow[]>([]);
+  const [txRows, setTxRows] = useState<TxRow[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [childrenError, setChildrenError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -128,8 +131,12 @@ function ParentChild() {
     setLoadingChildren(true);
     setChildrenError(null);
     try {
-      const result = await getParentChildrenFn({ data: { accessToken } });
-      setChildren(result.children as ParentChildRow[]);
+      const [childResult, txResult] = await Promise.all([
+        getParentChildrenFn({ data: { accessToken } }),
+        listTransactionsFn({ data: { accessToken } }).catch(() => ({ transactions: [] })),
+      ]);
+      setChildren(childResult.children as ParentChildRow[]);
+      setTxRows((txResult.transactions as TxRow[]) ?? []);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not load linked children.";
       setChildrenError(message);
@@ -212,8 +219,9 @@ function ParentChild() {
         ))}
 
         {!loadingChildren && children.map((c) => {
-          const ct = transactions.filter((t) => t.userId === c.id);
-          const flagged = ct.filter((t) => t.isFlagged).length;
+          const flaggedTx = txRows.filter((t) => t.owner_user_id === c.id && t.is_flagged);
+          const flaggedCount = flaggedTx.length;
+          const flaggedAmount = flaggedTx.reduce((sum, t) => sum + (t.amount ?? 0), 0);
           const statusLabel = c.status === "linked" ? "Linked" : c.status === "pending" ? "Invite pending" : c.status === "accepted" ? "Accepted" : "Expired";
           return (
             <Card key={c.id}><CardContent className="p-5 space-y-2">
@@ -227,8 +235,8 @@ function ParentChild() {
               <div className="grid grid-cols-2 gap-3 pt-2 text-sm">
                 {c.type === "child" ? (
                   <>
-                    <div><div className="text-muted-foreground text-xs">Transactions</div><div className="font-semibold">{ct.length}</div></div>
-                    <div><div className="text-muted-foreground text-xs">Flagged</div><div className="font-semibold text-destructive">{flagged}</div></div>
+                    <div><div className="text-muted-foreground text-xs">Flagged txns</div><div className="font-semibold text-destructive">{flaggedCount}</div></div>
+                    <div><div className="text-muted-foreground text-xs">Flagged amount</div><div className="font-semibold text-destructive">${flaggedAmount.toFixed(2)}</div></div>
                   </>
                 ) : (
                   <>

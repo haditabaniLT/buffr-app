@@ -269,12 +269,31 @@ export const listParentBankAccounts = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
 
+    // Fetch IDs of all children belonging to this parent (adult children who
+    // self-link their own bank accounts will have linked_by_parent_id = null,
+    // so we also need to match by owner_user_id being one of the parent's children).
+    const { data: childRows, error: childErr } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("parent_id", parentId);
+    if (childErr) throw childErr;
+    const childIds = (childRows ?? []).map((c) => c.id);
+
     const accounts = await withRetry(async () => {
-      const { data: r, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from("bank_accounts")
-        .select("id,owner_user_id,plaid_item_id,institution_name,account_name,account_mask,account_type,account_subtype,current_balance,iso_currency_code,created_at")
-        .eq("linked_by_parent_id", parentId)
-        .order("created_at", { ascending: false });
+        .select("id,owner_user_id,plaid_item_id,institution_name,account_name,account_mask,account_type,account_subtype,current_balance,iso_currency_code,created_at");
+
+      if (childIds.length > 0) {
+        // Accounts the parent linked for a child OR accounts a child linked themselves
+        query = query.or(
+          `linked_by_parent_id.eq.${parentId},owner_user_id.in.(${childIds.join(",")})`
+        );
+      } else {
+        query = query.eq("linked_by_parent_id", parentId);
+      }
+
+      const { data: r, error } = await query.order("created_at", { ascending: false });
       if (error) throw error;
       return r ?? [];
     }, "load bank accounts");
