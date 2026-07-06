@@ -14,7 +14,7 @@ function DashboardRedirect() {
   const [retryCount, setRetryCount] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
 
-  // Resolve an effective role. If user_roles is missing for any reason, infer
+  // Resolve an effective role. If role column is missing for any reason, infer
   // from the profile (parent_id => child, otherwise parent) so we don't dead-end.
   const effectiveRole = role ?? (profile ? (profile.parent_id ? "child" : "parent") : null);
 

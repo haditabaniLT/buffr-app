@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       bank_accounts: {
@@ -26,7 +51,7 @@ export type Database = {
           id: string
           institution_name: string | null
           iso_currency_code: string | null
-          linked_by_parent_id: string
+          linked_by_parent_id: string | null
           owner_user_id: string
           plaid_access_token: string
           plaid_account_id: string
@@ -45,7 +70,7 @@ export type Database = {
           id?: string
           institution_name?: string | null
           iso_currency_code?: string | null
-          linked_by_parent_id: string
+          linked_by_parent_id?: string | null
           owner_user_id: string
           plaid_access_token: string
           plaid_account_id: string
@@ -64,7 +89,7 @@ export type Database = {
           id?: string
           institution_name?: string | null
           iso_currency_code?: string | null
-          linked_by_parent_id?: string
+          linked_by_parent_id?: string | null
           owner_user_id?: string
           plaid_access_token?: string
           plaid_account_id?: string
@@ -72,143 +97,71 @@ export type Database = {
           transactions_sync_cursor?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_linked_by_parent_id_fkey"
+            columns: ["linked_by_parent_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_accounts_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      sms_logs: {
+      content_pages: {
         Row: {
+          body: string
           id: string
-          parent_id: string
-          transaction_id: string | null
-          phone: string
-          message: string
-          status: string
-          twilio_sid: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          parent_id: string
-          transaction_id?: string | null
-          phone: string
-          message: string
-          status?: string
-          twilio_sid?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          parent_id?: string
-          transaction_id?: string | null
-          phone?: string
-          message?: string
-          status?: string
-          twilio_sid?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      transactions: {
-        Row: {
-          account_id: string
-          amount: number
-          bank_account_id: string | null
-          category: string[]
-          created_at: string
-          date: string
-          flag_category: string | null
-          flag_reason: string | null
-          id: string
-          is_flagged: boolean
-          iso_currency_code: string
-          merchant_name: string | null
-          name: string | null
-          owner_user_id: string | null
-          pending: boolean
-          personal_finance_category: string | null
-          plaid_item_id: string
-          raw_json: Json | null
+          slug: string
+          title: string
           updated_at: string
         }
         Insert: {
-          account_id: string
-          amount: number
-          bank_account_id?: string | null
-          category?: string[]
-          created_at?: string
-          date: string
-          flag_category?: string | null
-          flag_reason?: string | null
-          id: string
-          is_flagged?: boolean
-          iso_currency_code?: string
-          merchant_name?: string | null
-          name?: string | null
-          owner_user_id?: string | null
-          pending?: boolean
-          personal_finance_category?: string | null
-          plaid_item_id: string
-          raw_json?: Json | null
+          body?: string
+          id?: string
+          slug: string
+          title: string
           updated_at?: string
         }
         Update: {
-          account_id?: string
-          amount?: number
-          bank_account_id?: string | null
-          category?: string[]
-          created_at?: string
-          date?: string
-          flag_category?: string | null
-          flag_reason?: string | null
+          body?: string
           id?: string
-          is_flagged?: boolean
-          iso_currency_code?: string
-          merchant_name?: string | null
-          name?: string | null
-          owner_user_id?: string | null
-          pending?: boolean
-          personal_finance_category?: string | null
-          plaid_item_id?: string
-          raw_json?: Json | null
+          slug?: string
+          title?: string
           updated_at?: string
         }
         Relationships: []
       }
-      plaid_webhook_events: {
+      faqs: {
         Row: {
-          bank_account_id: string | null
+          answer: string
           created_at: string
           id: string
-          linked_by_parent_id: string | null
-          linked_by_parent_name: string | null
-          owner_email: string | null
-          owner_name: string | null
-          owner_user_id: string | null
-          payload: string
-          plaid_item_id: string | null
+          question: string
+          sort_order: number
+          updated_at: string
         }
         Insert: {
-          bank_account_id?: string | null
+          answer: string
           created_at?: string
           id?: string
-          linked_by_parent_id?: string | null
-          linked_by_parent_name?: string | null
-          owner_email?: string | null
-          owner_name?: string | null
-          owner_user_id?: string | null
-          payload: string
-          plaid_item_id?: string | null
+          question: string
+          sort_order?: number
+          updated_at?: string
         }
         Update: {
-          bank_account_id?: string | null
+          answer?: string
           created_at?: string
           id?: string
-          linked_by_parent_id?: string | null
-          linked_by_parent_name?: string | null
-          owner_email?: string | null
-          owner_name?: string | null
-          owner_user_id?: string | null
-          payload?: string
-          plaid_item_id?: string | null
+          question?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -283,71 +236,253 @@ export type Database = {
         }
         Relationships: []
       }
-      roles: {
+      notifications: {
         Row: {
-          id: number
-          name: string
+          body: string
+          created_at: string
+          id: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
         }
         Insert: {
-          id?: number
-          name: string
+          body: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
         }
         Update: {
-          id?: number
-          name?: string
+          body?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plaid_webhook_events: {
+        Row: {
+          bank_account_id: string | null
+          created_at: string
+          id: string
+          linked_by_parent_id: string | null
+          linked_by_parent_name: string | null
+          owner_email: string | null
+          owner_name: string | null
+          owner_user_id: string | null
+          payload: string
+          plaid_item_id: string | null
+        }
+        Insert: {
+          bank_account_id?: string | null
+          created_at?: string
+          id?: string
+          linked_by_parent_id?: string | null
+          linked_by_parent_name?: string | null
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_user_id?: string | null
+          payload: string
+          plaid_item_id?: string | null
+        }
+        Update: {
+          bank_account_id?: string | null
+          created_at?: string
+          id?: string
+          linked_by_parent_id?: string | null
+          linked_by_parent_name?: string | null
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_user_id?: string | null
+          payload?: string
+          plaid_item_id?: string | null
         }
         Relationships: []
       }
-      user_roles: {
+      sms_logs: {
         Row: {
           created_at: string
           id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          message: string
+          parent_id: string
+          phone: string
+          status: string
+          transaction_id: string | null
+          twilio_sid: string | null
         }
         Insert: {
           created_at?: string
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          message: string
+          parent_id: string
+          phone: string
+          status?: string
+          transaction_id?: string | null
+          twilio_sid?: string | null
         }
         Update: {
           created_at?: string
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
+          message?: string
+          parent_id?: string
+          phone?: string
+          status?: string
+          transaction_id?: string | null
+          twilio_sid?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sms_logs_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          bank_account_id: string | null
+          category: string[]
+          created_at: string
+          date: string
+          flag_category: Database["public"]["Enums"]["flag_category"] | null
+          flag_reason: string | null
+          id: string
+          is_flagged: boolean
+          iso_currency_code: string
+          merchant_name: string | null
+          name: string | null
+          owner_user_id: string | null
+          pending: boolean
+          personal_finance_category: string | null
+          plaid_item_id: string
+          raw_json: Json | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          bank_account_id?: string | null
+          category?: string[]
+          created_at?: string
+          date: string
+          flag_category?: Database["public"]["Enums"]["flag_category"] | null
+          flag_reason?: string | null
+          id: string
+          is_flagged?: boolean
+          iso_currency_code?: string
+          merchant_name?: string | null
+          name?: string | null
+          owner_user_id?: string | null
+          pending?: boolean
+          personal_finance_category?: string | null
+          plaid_item_id: string
+          raw_json?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          bank_account_id?: string | null
+          category?: string[]
+          created_at?: string
+          date?: string
+          flag_category?: Database["public"]["Enums"]["flag_category"] | null
+          flag_reason?: string | null
+          id?: string
+          is_flagged?: boolean
+          iso_currency_code?: string
+          merchant_name?: string | null
+          name?: string | null
+          owner_user_id?: string | null
+          pending?: boolean
+          personal_finance_category?: string | null
+          plaid_item_id?: string
+          raw_json?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
           avatar_url: string | null
           created_at: string
+          date_of_birth: string | null
           email: string
           id: string
+          is_minor: boolean
           name: string
           parent_id: string | null
           phone: string | null
+          role: string
+          sms_opted_out: boolean
           status: Database["public"]["Enums"]["user_status"]
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email: string
           id: string
+          is_minor?: boolean
           name?: string
           parent_id?: string | null
           phone?: string | null
+          role?: string
+          sms_opted_out?: boolean
           status?: Database["public"]["Enums"]["user_status"]
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email?: string
           id?: string
+          is_minor?: boolean
           name?: string
           parent_id?: string | null
           phone?: string | null
+          role?: string
+          sms_opted_out?: boolean
           status?: Database["public"]["Enums"]["user_status"]
         }
         Relationships: [
@@ -376,8 +511,8 @@ export type Database = {
           parent_id: string
           parent_name: string
           phone: string
-          role: Database["public"]["Enums"]["app_role"]
-          status: Database["public"]["Enums"]["user_status"]
+          role: string
+          status: string
         }[]
       }
       get_invitation_by_token: {
@@ -389,10 +524,7 @@ export type Database = {
           status: Database["public"]["Enums"]["invitation_status"]
         }[]
       }
-      get_primary_role: {
-        Args: { _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
+      get_primary_role: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -403,7 +535,18 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "parent" | "child"
-      flag_category: "gambling" | "payday_loan" | "crypto" | "high_risk"
+      flag_category:
+        | "gambling"
+        | "payday_loan"
+        | "crypto"
+        | "high_risk"
+        | "adult_content"
+        | "mlm"
+        | "dark_web"
+        | "tobacco_minor"
+        | "gaming_lootbox"
+        | "suspicious_marketplace"
+        | "other_risk"
       invitation_status: "pending" | "accepted" | "expired"
       risk_level: "low" | "medium" | "high"
       user_status: "active" | "suspended" | "blocked"
@@ -532,10 +675,25 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "parent", "child"],
-      flag_category: ["gambling", "payday_loan", "crypto", "high_risk"],
+      flag_category: [
+        "gambling",
+        "payday_loan",
+        "crypto",
+        "high_risk",
+        "adult_content",
+        "mlm",
+        "dark_web",
+        "tobacco_minor",
+        "gaming_lootbox",
+        "suspicious_marketplace",
+        "other_risk",
+      ],
       invitation_status: ["pending", "accepted", "expired"],
       risk_level: ["low", "medium", "high"],
       user_status: ["active", "suspended", "blocked"],

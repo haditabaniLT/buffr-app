@@ -272,7 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authError,
     signUpParent: async ({ name, email, phone, password }) => {
       try {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -280,7 +280,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             data: { name, phone, role: "parent" },
           },
         });
-        return { error };
+        if (error) {
+          const raw = error.message ?? "";
+          // Supabase returns "{}" when the API response body has no human-readable text
+          // (e.g. transient email service error).
+          const isJunk = raw === "{}" || raw === "[]" || raw === "" || /^\s*\{/.test(raw);
+          const msg = isJunk ? "Signup failed. Please try again." : raw;
+          return { error: new Error(msg) };
+        }
+        return { error: null };
       } catch (e) {
         return { error: e instanceof Error ? e : new Error("Network error during signup") };
       }

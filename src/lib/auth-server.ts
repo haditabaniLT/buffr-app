@@ -38,7 +38,7 @@ export const getAuthSnapshot = createServerFn({ method: "POST" })
         withRetry(async () => {
           const r = await supabaseAdmin
             .from("users")
-            .select("id,name,email,phone,avatar_url,parent_id,status")
+            .select("id,name,email,phone,avatar_url,parent_id,status,role,is_minor,date_of_birth,sms_opted_out")
             .eq("id", uid)
             .maybeSingle();
           if (r.error) throw r.error;

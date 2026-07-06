@@ -167,7 +167,7 @@ export const createParentChild = createServerFn({ method: "POST" })
     }
 
     // Create an auth user for the child so the handle_new_user trigger
-    // creates the profile + user_roles row, then link to parent.
+    // creates the profile row with role='child', then link to parent.
     // We set email_confirm:true (parent-verified) and generate a random temp
     // password — the child will set their own via the activation email below.
     const tempPassword = crypto.randomUUID() + crypto.randomUUID(); // 72-char random, never exposed

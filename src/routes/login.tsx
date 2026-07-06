@@ -14,12 +14,13 @@ export const Route = createFileRoute("/login")({
 });
 
 function friendlyAuthError(msg: string): string {
+  if (!msg || msg === "{}" || msg === "[]" || /^\s*\{/.test(msg)) return "Sign in failed. Please try again.";
   const m = msg.toLowerCase();
   if (m.includes("email not confirmed")) return "Please verify your email first. Check your inbox for the confirmation link.";
   if (m.includes("invalid login") || m.includes("invalid credentials")) return "Incorrect email or password.";
   if (m.includes("network") || m.includes("failed to fetch")) return "Network error. Check your connection and try again.";
   if (m.includes("rate limit")) return "Too many attempts. Please wait a moment and try again.";
-  return msg || "Sign in failed. Please try again.";
+  return msg;
 }
 
 function LoginPage() {

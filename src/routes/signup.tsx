@@ -14,13 +14,15 @@ export const Route = createFileRoute("/signup")({
 });
 
 function friendlySignupError(msg: string): string {
+  if (!msg || msg === "{}" || msg === "[]" || /^\s*\{/.test(msg)) return "Signup failed. Please try again.";
   const m = msg.toLowerCase();
   if (m.includes("already registered") || m.includes("user already")) return "An account with this email already exists. Try signing in instead.";
+  if (m.includes("email rate limit") || m.includes("email link")) return "Too many signup attempts. Please wait a few minutes and try again.";
   if (m.includes("invalid email")) return "Please enter a valid email address.";
   if (m.includes("password")) return msg;
   if (m.includes("network") || m.includes("failed to fetch")) return "Network error. Check your connection and try again.";
   if (m.includes("rate limit")) return "Too many attempts. Please wait a moment and try again.";
-  return msg || "Signup failed. Please try again.";
+  return msg;
 }
 
 function SignupPage() {
@@ -53,6 +55,7 @@ function SignupPage() {
       const { error } = await signUpParent({ name, email, phone, password });
       setSubmitting(false);
       if (error) {
+        console.log("Signup error:", error);
         const friendly = friendlySignupError(error.message);
         setErrorMsg(friendly);
         toast.error(friendly);
