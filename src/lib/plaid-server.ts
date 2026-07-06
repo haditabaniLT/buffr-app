@@ -269,31 +269,19 @@ export const listParentBankAccounts = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
 
-    // Fetch IDs of all children belonging to this parent (adult children who
-    // self-link their own bank accounts will have linked_by_parent_id = null,
-    // so we also need to match by owner_user_id being one of the parent's children).
+    // All accounts visible to this parent = those owned by the parent or any of
+    // their children (covers parent-linked, child self-linked, and reassigned accounts).
     const { data: childRows, error: childErr } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("parent_id", parentId);
+      .from("users").select("id").eq("parent_id", parentId);
     if (childErr) throw childErr;
-    const childIds = (childRows ?? []).map((c) => c.id);
+    const familyIds = [parentId, ...(childRows ?? []).map((c) => c.id)];
 
     const accounts = await withRetry(async () => {
-      let query = supabaseAdmin
+      const { data: r, error } = await supabaseAdmin
         .from("bank_accounts")
-        .select("id,owner_user_id,plaid_item_id,institution_name,account_name,account_mask,account_type,account_subtype,current_balance,iso_currency_code,created_at");
-
-      if (childIds.length > 0) {
-        // Accounts the parent linked for a child OR accounts a child linked themselves
-        query = query.or(
-          `linked_by_parent_id.eq.${parentId},owner_user_id.in.(${childIds.join(",")})`
-        );
-      } else {
-        query = query.eq("linked_by_parent_id", parentId);
-      }
-
-      const { data: r, error } = await query.order("created_at", { ascending: false });
+        .select("id,owner_user_id,plaid_item_id,institution_name,account_name,account_mask,account_type,account_subtype,current_balance,iso_currency_code,created_at")
+        .in("owner_user_id", familyIds)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return r ?? [];
     }, "load bank accounts");
@@ -326,25 +314,29 @@ export const assignBankAccountOwner = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
 
-    // Verify ownerUserId is the parent themselves or a child of this parent
-    if (data.ownerUserId !== parentId) {
-      const { data: child, error } = await supabaseAdmin
-        .from("users")
-        .select("id,parent_id")
-        .eq("id", data.ownerUserId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!child || child.parent_id !== parentId) {
-        throw new Error("You can only assign accounts to yourself or your children.");
-      }
+    // Fetch all children to build the family ID set
+    const { data: childRows, error: childErr } = await supabaseAdmin
+      .from("users").select("id").eq("parent_id", parentId);
+    if (childErr) throw childErr;
+    const childIds = (childRows ?? []).map((c) => c.id);
+    const familyIds = [parentId, ...childIds];
+
+    // Verify the target owner is the parent or one of their children
+    if (!familyIds.includes(data.ownerUserId)) {
+      throw new Error("You can only assign accounts to yourself or your children.");
     }
+
+    // Verify the account currently belongs to this parent's family before updating
+    const { data: existing, error: scopeErr } = await supabaseAdmin
+      .from("bank_accounts").select("id").eq("id", data.accountId).in("owner_user_id", familyIds).maybeSingle();
+    if (scopeErr) throw scopeErr;
+    if (!existing) throw new Error("Account not found or access denied.");
 
     await withRetry(async () => {
       const { error } = await supabaseAdmin
         .from("bank_accounts")
         .update({ owner_user_id: data.ownerUserId })
-        .eq("id", data.accountId)
-        .eq("linked_by_parent_id", parentId);
+        .eq("id", data.accountId);
       if (error) throw error;
     }, "assign account");
 
@@ -359,12 +351,17 @@ export const deleteBankAccount = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+
+    const { data: childRows } = await supabaseAdmin
+      .from("users").select("id").eq("parent_id", parentId);
+    const familyIds = [parentId, ...(childRows ?? []).map((c) => c.id)];
+
     await withRetry(async () => {
       const { error } = await supabaseAdmin
         .from("bank_accounts")
         .delete()
         .eq("id", data.accountId)
-        .eq("linked_by_parent_id", parentId);
+        .in("owner_user_id", familyIds);
       if (error) throw error;
     }, "remove account");
     return { ok: true };
@@ -393,12 +390,16 @@ export const fireSandboxWebhook = createServerFn({ method: "POST" })
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
     const creds = plaidCreds();
 
+    const { data: childRows } = await supabaseAdmin
+      .from("users").select("id").eq("parent_id", parentId);
+    const familyIds = [parentId, ...(childRows ?? []).map((c) => c.id)];
+
     const account = await withRetry(async () => {
       const { data: row, error } = await supabaseAdmin
         .from("bank_accounts")
         .select("plaid_access_token")
         .eq("plaid_item_id", data.plaidItemId)
-        .eq("linked_by_parent_id", parentId)
+        .in("owner_user_id", familyIds)
         .limit(1)
         .maybeSingle();
       if (error) throw error;
@@ -438,12 +439,16 @@ export const injectAndFireWebhook = createServerFn({ method: "POST" })
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
     const creds = plaidCreds();
 
+    const { data: childRows } = await supabaseAdmin
+      .from("users").select("id").eq("parent_id", parentId);
+    const familyIds = [parentId, ...(childRows ?? []).map((c) => c.id)];
+
     const account = await withRetry(async () => {
       const { data: row, error } = await supabaseAdmin
         .from("bank_accounts")
         .select("plaid_access_token")
         .eq("plaid_item_id", data.plaidItemId)
-        .eq("linked_by_parent_id", parentId)
+        .in("owner_user_id", familyIds)
         .limit(1)
         .maybeSingle();
       if (error) throw error;
@@ -504,12 +509,16 @@ export const createSandboxTransactions = createServerFn({ method: "POST" })
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
     const creds = plaidCreds();
 
+    const { data: childRows } = await supabaseAdmin
+      .from("users").select("id").eq("parent_id", parentId);
+    const familyIds = [parentId, ...(childRows ?? []).map((c) => c.id)];
+
     const account = await withRetry(async () => {
       const { data: row, error } = await supabaseAdmin
         .from("bank_accounts")
         .select("plaid_access_token, transactions_sync_cursor")
         .eq("plaid_item_id", data.plaidItemId)
-        .eq("linked_by_parent_id", parentId)
+        .in("owner_user_id", familyIds)
         .limit(1)
         .maybeSingle();
       if (error) throw error;
@@ -570,12 +579,16 @@ export const syncTransactionsManually = createServerFn({ method: "POST" })
     const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
     const creds = plaidCreds();
 
+    const { data: childRows } = await supabaseAdmin
+      .from("users").select("id").eq("parent_id", parentId);
+    const familyIds = [parentId, ...(childRows ?? []).map((c) => c.id)];
+
     const account = await withRetry(async () => {
       const { data: row, error } = await supabaseAdmin
         .from("bank_accounts")
         .select("plaid_access_token, transactions_sync_cursor")
         .eq("plaid_item_id", data.plaidItemId)
-        .eq("linked_by_parent_id", parentId)
+        .in("owner_user_id", familyIds)
         .limit(1)
         .maybeSingle();
       if (error) throw error;
