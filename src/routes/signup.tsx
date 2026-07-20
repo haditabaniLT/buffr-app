@@ -38,8 +38,8 @@ function SignupPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !phone || !password) return;
-    if (!smsConsent) {
+    if (!name || !email || !password) return;
+    if (phone && !smsConsent) {
       const msg = "Please agree to receive SMS alerts to continue.";
       setErrorMsg(msg); toast.error(msg); return;
     }
@@ -92,7 +92,7 @@ function SignupPage() {
             <form className="space-y-3" onSubmit={submit}>
               <div className="space-y-1.5"><Label>Full name</Label><Input value={name} onChange={(e) => setName(e.target.value)} required disabled={submitting} /></div>
               <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={submitting} /></div>
-              <div className="space-y-1.5"><Label>Phone number</Label><Input type="tel" placeholder="+1 (555) 555-5555" value={phone} onChange={(e) => setPhone(e.target.value)} required disabled={submitting} /></div>
+              <div className="space-y-1.5"><Label>Phone number <span className="text-muted-foreground font-normal">(optional)</span></Label><Input type="tel" placeholder="+1 (555) 555-5555" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={submitting} /></div>
               <div className="space-y-1.5"><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={submitting} minLength={8} /></div>
 
               {/* SMS consent — required for A2P 10DLC compliance */}
@@ -106,10 +106,10 @@ function SignupPage() {
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border accent-primary cursor-pointer"
                 />
                 <label htmlFor="sms-consent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-                  By providing your phone number, you agree to receive text alerts from{" "}
-                  <span className="font-medium text-foreground">Buffr</span> when risky financial
-                  activity is detected. Msg &amp; data rates may apply. Up to 10 msgs/mo.{" "}
-                  Reply <span className="font-medium">STOP</span> to opt out,{" "}
+                  By providing your phone number and checking this box, you are opting in and agreeing
+                  to receive alerts from <span className="font-medium text-foreground">Buffr</span> when
+                  certain transaction activity is detected. Msg &amp; data rates may apply. Up to 10
+                  msgs/mo. Reply <span className="font-medium">STOP</span> to opt out,{" "}
                   <span className="font-medium">HELP</span> for help. See our{" "}
                   <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>{" "}
                   and{" "}
@@ -117,7 +117,7 @@ function SignupPage() {
                 </label>
               </div>
 
-              <Button className="w-full" type="submit" disabled={submitting || !smsConsent}>{submitting ? "Creating..." : "Create account"}</Button>
+              <Button className="w-full" type="submit" disabled={submitting || (!!phone && !smsConsent)}>{submitting ? "Creating..." : "Create account"}</Button>
             </form>
             <p className="text-xs text-muted-foreground text-center">
               Already have an account? <Link to="/login" className="hover:underline">Sign in</Link>

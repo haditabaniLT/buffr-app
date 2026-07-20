@@ -740,7 +740,7 @@ async function syncAndStoreFlagged(
         const msg = msgBody;
         await supabaseAdmin.from("sms_logs").insert({
           parent_id: parentId, transaction_id: txn.transaction_id,
-          phone: parentPhone ?? "unknown", message: msg,
+          phone: parentPhone || "unknown", message: msg,
           status: smsStatus, twilio_sid: twilioSid,
         });
 

@@ -30,7 +30,7 @@ type AuthCtx = {
   signUpParent: (args: {
     name: string;
     email: string;
-    phone: string;
+    phone?: string;
     password: string;
   }) => Promise<{ error: Error | null }>;
   signIn: (
@@ -277,7 +277,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/login`,
-            data: { name, phone, role: "parent" },
+            // Pass phone only when provided so the trigger stores NULL (not "") when omitted
+            data: { name, role: "parent", ...(phone ? { phone } : {}) },
           },
         });
         if (error) {
