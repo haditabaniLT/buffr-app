@@ -156,6 +156,7 @@ export interface SyncResult {
   modified: number;
   removed: number;
   cursor: string;
+  addedIds: string[];
 }
 
 /**
@@ -259,12 +260,21 @@ export async function syncTransactions(
       .eq("plaid_item_id", itemId);
   }
 
+  const addedIds = allAdded.map((t) => t.transaction_id);
+  console.log(`[sync] complete item=${itemId}`, JSON.stringify({
+    added:    allAdded.length,
+    modified: allModified.length,
+    removed:  allRemovedIds.length,
+    upserted: toUpsert.length,
+    cursor_advanced: !!nextCursor,
+  }));
+
   return {
     added: allAdded.length,
     modified: allModified.length,
     removed: allRemovedIds.length,
     cursor: nextCursor,
-    addedIds: allAdded.map((t) => t.transaction_id),
+    addedIds,
   };
 }
 
@@ -349,9 +359,6 @@ async function analyzeTransactionWithAI(txn: {
 - Plaid category: ${(txn.category ?? []).join(", ") || "(none)"}
 - Personal finance category: ${txn.personal_finance_category || "(none)"}`;
 
-console.log("====USER TRANSACTION DATA======", JSON.stringify(userContent,null,1))
-
-
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -360,8 +367,8 @@ console.log("====USER TRANSACTION DATA======", JSON.stringify(userContent,null,1
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5",
-        temperature: 1,
+        model: "gpt-4o",
+        temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: AI_SYSTEM_PROMPT },
@@ -376,8 +383,6 @@ console.log("====USER TRANSACTION DATA======", JSON.stringify(userContent,null,1
     }
 
     const json: any = await res.json();
-    console.log("[API LOG]", JSON.stringify(json,null,1))
-
     const raw = json?.choices?.[0]?.message?.content;
     if (!raw) return null;
     return JSON.parse(raw) as AIFraudResult;
@@ -426,6 +431,8 @@ export async function flagAndNotify(
   plaidItemId: string,
 ): Promise<number> {
   if (!txnIds.length) return 0;
+
+  console.log(`[flag] start item=${plaidItemId}`, JSON.stringify({ candidates: txnIds.length }));
 
   // Load transactions + merchants in parallel
   const [txnRes, merchantRes, accountRes] = await Promise.all([
@@ -476,6 +483,7 @@ export async function flagAndNotify(
     if (match) {
       flagReason   = `${match.category.replace(/_/g, " ")} – ${match.name}`;
       flagCategory = match.category;
+      console.log(`[flag] rule-match txn=${txn.id}`, JSON.stringify({ category: flagCategory }));
     } else {
       // 2. Fall back to AI analysis
       const ai = await analyzeTransactionWithAI({
@@ -486,11 +494,20 @@ export async function flagAndNotify(
         personal_finance_category: txn.personal_finance_category,
       });
 
-      if (!ai || !ai.is_fraud) continue; // AI says safe (or unreachable) — will be deleted below
+      if (!ai || !ai.is_fraud) {
+        console.log(`[flag] ai-check txn=${txn.id}`, JSON.stringify({
+          verdict: ai ? "safe" : "ai_unavailable",
+        }));
+        continue;
+      }
 
       const safeCat = safeCategory(ai.category);
       flagReason   = `${safeCat.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())} – ${ai.risk_level.charAt(0).toUpperCase() + ai.risk_level.slice(1)} Risk`;
       flagCategory = safeCat;
+      console.log(`[flag] ai-flagged txn=${txn.id}`, JSON.stringify({
+        category: safeCat,
+        risk_level: ai.risk_level,
+      }));
 
       // Persist merchant so future rule-based checks catch it
       await addDetectedMerchant(
@@ -534,30 +551,47 @@ export async function flagAndNotify(
       .delete()
       .in("id", unflaggedIds);
     if (delErr) console.error("flagAndNotify: cleanup delete error:", delErr);
+    else console.log(`[flag] cleaned ${unflaggedIds.length} non-flagged transaction(s)`);
   }
+
+  console.log(`[flag] summary`, JSON.stringify({
+    checked:  txns.length,
+    flagged:  newlyFlagged.length,
+    cleaned:  unflaggedIds.length,
+    parent_found: !!parentDbId,
+  }));
 
   if (!newlyFlagged.length || !parentDbId) return newlyFlagged.length;
 
-  // Fetch parent phone (only once)
+  // Fetch parent phone + opt-out status (only once)
   const { data: parent } = await supabase
     .from("users")
-    .select("phone")
+    .select("phone, sms_opted_out")
     .eq("id", parentDbId)
     .maybeSingle();
-  parentPhone = (parent as { phone?: string | null } | null)?.phone ?? null;
+  const parentData = parent as { phone?: string | null; sms_opted_out?: boolean } | null;
+  parentPhone = parentData?.phone ?? null;
+  const smsOptedOut = parentData?.sms_opted_out ?? false;
 
   // Send SMS + log for each flagged transaction
   for (const txn of newlyFlagged) {
     const msg =
-      `Buffr Alert ⚠️ ${txn.name} — $${Math.abs(txn.amount).toFixed(2)} flagged (${txn.reason}). Check your Buffr dashboard.`;
+      `Buffr Alert ⚠️ ${txn.name} — $${Math.abs(txn.amount).toFixed(2)} flagged (${txn.reason}). Check your Buffr dashboard. Msg & data rates may apply. Reply STOP to opt out.`;
 
     let status = "pending";
     let twilioSid: string | undefined;
 
-    if (parentPhone) {
+    if (parentPhone && !smsOptedOut) {
       const result = await sendSms(parentPhone, msg);
       status    = result.success ? "delivered" : "failed";
       twilioSid = result.sid;
+      console.log(`[sms] txn=${txn.id}`, JSON.stringify({
+        status,
+        sid: twilioSid ?? null,
+      }));
+    } else {
+      const reason = !parentPhone ? "no_phone" : "opted_out";
+      console.log(`[sms] skipped txn=${txn.id}`, JSON.stringify({ reason }));
     }
 
     await supabase.from("sms_logs").insert({

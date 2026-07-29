@@ -151,6 +151,51 @@ export const createParentChild = createServerFn({ method: "POST" })
         return row;
       }, "create the invitation");
 
+      // Send invitation email via Resend (non-fatal — log and continue)
+      const resendKey = process.env.RESEND_API_KEY;
+      const siteUrl = process.env.SITE_URL ?? "https://usebuffr.com";
+      const inviteUrl = `${siteUrl}/invite/${token}`;
+      if (resendKey && !resendKey.startsWith("re_your_")) {
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${resendKey}`,
+            },
+            body: JSON.stringify({
+              from: "Buffr <noreply@usebuffr.com>",
+              to: [email],
+              subject: "You've been invited to join Buffr",
+              html: `
+                <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
+                  <h2 style="font-size:20px;margin-bottom:8px">You've been invited to Buffr</h2>
+                  <p style="color:#444;margin-bottom:20px">
+                    A family member has invited you to connect your bank account to Buffr,
+                    a parental financial monitoring app.
+                  </p>
+                  <a href="${inviteUrl}"
+                     style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">
+                    Accept invitation
+                  </a>
+                  <p style="color:#888;font-size:12px;margin-top:24px">
+                    Or copy this link: ${inviteUrl}<br>
+                    This invitation expires in 7 days.
+                  </p>
+                </div>`,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.text();
+            console.error("[invitation] Resend error:", err);
+          }
+        } catch (emailErr) {
+          console.error("[invitation] Failed to send invitation email:", emailErr);
+        }
+      } else {
+        console.warn("[invitation] RESEND_API_KEY not configured — invitation email not sent. Link:", inviteUrl);
+      }
+
       return {
         mode: "invitation" as const,
         token,

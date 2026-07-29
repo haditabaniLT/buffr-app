@@ -300,10 +300,10 @@ function ParentChild() {
           {step === "invited" && (
             <>
               <DialogHeader>
-                <DialogTitle>Invitation ready</DialogTitle>
+                <DialogTitle>Invitation sent</DialogTitle>
                 <DialogDescription>
-                  In production we'd email this link to <span className="font-medium text-foreground">{email}</span>.
-                  For now you can copy it or open it directly. Once they accept and connect their bank via Plaid,
+                  An invitation email has been sent to <span className="font-medium text-foreground">{email}</span>.
+                  You can also copy the link below to share it directly. Once they accept and connect their bank via Plaid,
                   both dashboards will be linked.
                 </DialogDescription>
               </DialogHeader>
