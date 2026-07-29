@@ -32,6 +32,14 @@ function json(body: unknown, status = 200) {
   });
 }
 
+/** Structured logger — every line is prefixed with [webhook] for easy log filtering. */
+function log(level: "info" | "warn" | "error", msg: string, data?: Record<string, unknown>) {
+  const entry = data ? `[webhook] ${msg} ${JSON.stringify(data)}` : `[webhook] ${msg}`;
+  if (level === "error") console.error(entry);
+  else if (level === "warn") console.warn(entry);
+  else console.log(entry);
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -44,15 +52,17 @@ Deno.serve(async (req) => {
 
   // ── 1. Read raw body (must happen before any other await) ──────────────────
   const rawBody = await req.text();
+  log("info", "received request", { size_bytes: rawBody.length });
 
   // ── 2. Verify Plaid-Verification JWT ───────────────────────────────────────
   const verificationHeader = req.headers.get("plaid-verification");
   const verified = await verifyPlaidWebhook(rawBody, verificationHeader);
 
   if (!verified) {
-    console.warn("Rejected webhook — signature invalid or stale");
+    log("warn", "rejected — signature invalid or stale");
     return json({ error: "Unauthorized" }, 401);
   }
+  log("info", "signature verified");
 
   // ── 3. Parse payload ───────────────────────────────────────────────────────
   let payload: {
@@ -64,12 +74,13 @@ Deno.serve(async (req) => {
   try {
     payload = JSON.parse(rawBody);
   } catch {
+    log("error", "invalid JSON body");
     return json({ error: "Invalid JSON" }, 400);
   }
 
   const { webhook_type, webhook_code, item_id } = payload;
 
-  console.log(`Plaid webhook: ${webhook_type}/${webhook_code} item=${item_id}`);
+  log("info", "payload parsed", { webhook_type, webhook_code, item_id: item_id ?? null });
 
   // ── 4. Supabase client (service role — bypasses RLS) ──────────────────────
   const supabase = createClient(
@@ -82,7 +93,11 @@ Deno.serve(async (req) => {
     payload: rawBody,
     plaid_item_id: item_id ?? null,
   });
-  if (logErr) console.error("plaid_webhook_events insert error:", logErr);
+  if (logErr) {
+    log("error", "plaid_webhook_events insert failed", { message: logErr.message });
+  } else {
+    log("info", "event persisted to plaid_webhook_events");
+  }
 
   // ── 6. Handle TRANSACTIONS webhooks ───────────────────────────────────────
   const TRANSACTION_CODES = new Set([
@@ -92,13 +107,11 @@ Deno.serve(async (req) => {
     "HISTORICAL_UPDATE",
   ]);
 
-  console.log("====rawBody====", rawBody)
-
   let syncResult = null;
 
   if (webhook_type === "TRANSACTIONS" && item_id && TRANSACTION_CODES.has(webhook_code ?? "")) {
-    console.log(`if (webhook_type === "TRANSACTIONS" && item_id && TRANSACTION_CODES.has(webhook_code ?? "")) {`)
-    console.log(`// Look up plaid_access_token + current cursor for this item`);
+    log("info", "TRANSACTIONS webhook — starting sync pipeline");
+
     // Look up plaid_access_token + current cursor for this item
     const { data: account, error: lookupErr } = await supabase
       .from("bank_accounts")
@@ -108,10 +121,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (lookupErr) {
-      console.error("bank_accounts lookup error:", lookupErr);
+      log("error", "bank_accounts lookup failed", { message: lookupErr.message });
     } else if (!account?.plaid_access_token) {
-      console.warn(`No bank_account found for plaid_item_id: ${item_id}`);
+      log("warn", "no bank_account found for item", { item_id });
     } else {
+      const hasCursor = !!account.transactions_sync_cursor;
+      log("info", "bank_account resolved", {
+        item_id,
+        cursor: hasCursor ? "existing" : "fresh (first sync)",
+      });
+
       try {
         syncResult = await syncTransactions(
           supabase,
@@ -119,17 +138,34 @@ Deno.serve(async (req) => {
           item_id,
           account.transactions_sync_cursor ?? null,
         );
-        console.log("Sync complete:", syncResult);
+
+        log("info", "sync complete", {
+          added:    syncResult.added,
+          modified: syncResult.modified,
+          removed:  syncResult.removed,
+          new_ids:  syncResult.addedIds?.length ?? 0,
+        });
 
         // Flag merchant matches + send SMS to parent for each new flagged txn
         if (syncResult.addedIds?.length) {
+          log("info", "flagging pipeline starting", { candidates: syncResult.addedIds.length });
           const flagged = await flagAndNotify(supabase, syncResult.addedIds, item_id);
-          console.log(`Flagged ${flagged} transaction(s)`);
+          log("info", "flagging pipeline complete", {
+            candidates: syncResult.addedIds.length,
+            flagged,
+            cleaned: syncResult.addedIds.length - flagged,
+          });
+        } else {
+          log("info", "no new transactions to flag");
         }
       } catch (err) {
-        console.error("syncTransactions threw:", err);
+        log("error", "sync pipeline threw", {
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     }
+  } else {
+    log("info", "webhook type not handled — no action taken", { webhook_type, webhook_code });
   }
 
   return json({ ok: true, webhook_code, sync: syncResult });
