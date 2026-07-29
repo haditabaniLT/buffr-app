@@ -118,8 +118,8 @@ Respond ONLY with valid JSON matching this exact shape:
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5-nano",
-        temperature: 0.1,
+        model: "gpt-5",
+        temperature: 1,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },

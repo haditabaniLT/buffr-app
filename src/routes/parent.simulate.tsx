@@ -76,6 +76,14 @@ type Result = {
 };
 
 function SimulatePage() {
+  if (import.meta.env.PROD) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+        This page is not available in production.
+      </div>
+    );
+  }
+
   const { session } = useAuth();
 
   const listAccountsFn      = useServerFn(listParentBankAccounts);

@@ -36,3 +36,4 @@ temp_interactive_push.bat
 .env
 # Local Netlify folder
 .netlify
+branch_structure.json

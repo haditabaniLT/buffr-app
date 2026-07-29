@@ -10,14 +10,14 @@ const navByRole = {
     { to: "/parent/flagged", label: "Flagged Transactions" },
     { to: "/parent/accounts", label: "Bank Accounts" },
     { to: "/parent/child", label: "Child" },
-    { to: "/parent/simulate", label: "Simulate" },
+    ...(import.meta.env.DEV ? [{ to: "/parent/simulate", label: "Simulate" }] : []),
     { to: "/parent/settings", label: "Settings" },
   ],
   child: [
     { to: "/student", label: "Dashboard" },
     { to: "/student/accounts", label: "Bank Accounts" },
     { to: "/student/settings", label: "Settings" },
-    { to: "/parent/simulate", label: "Simulate" },
+    ...(import.meta.env.DEV ? [{ to: "/parent/simulate", label: "Simulate" }] : []),
   ],
   admin: [
     { to: "/admin", label: "Overview" },
