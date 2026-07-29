@@ -367,8 +367,8 @@ async function analyzeTransactionWithAI(txn: {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
-        temperature: 0.1,
+        model: "gpt-5",
+        temperature: 1,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: AI_SYSTEM_PROMPT },
@@ -446,7 +446,7 @@ export async function flagAndNotify(
       .select("name, category, risk_level"),
     supabase
       .from("bank_accounts")
-      .select("linked_by_parent_id")
+      .select("linked_by_parent_id, owner_user_id")
       .eq("plaid_item_id", plaidItemId)
       .limit(1)
       .maybeSingle(),
@@ -454,7 +454,18 @@ export async function flagAndNotify(
 
   const txns      = (txnRes.data    ?? []) as Array<{ id: string; name: string | null; merchant_name: string | null; amount: number; owner_user_id: string | null; category: string[] | null; personal_finance_category: string | null }>;
   const merchants = (merchantRes.data ?? []) as MerchantRow[];
-  const parentId  = (accountRes.data as { linked_by_parent_id: string } | null)?.linked_by_parent_id ?? null;
+  const accountData = accountRes.data as { linked_by_parent_id: string | null; owner_user_id: string | null } | null;
+  // linked_by_parent_id is set when a parent linked the account; null when a child self-linked.
+  // For self-linked accounts, fall back to users.parent_id of the account owner.
+  let parentId: string | null = accountData?.linked_by_parent_id ?? null;
+  if (!parentId && accountData?.owner_user_id) {
+    const { data: ownerRow } = await supabase
+      .from("users")
+      .select("parent_id")
+      .eq("id", accountData.owner_user_id)
+      .maybeSingle();
+    parentId = (ownerRow as { parent_id: string | null } | null)?.parent_id ?? null;
+  }
 
   if (!txns.length) return 0;
 
