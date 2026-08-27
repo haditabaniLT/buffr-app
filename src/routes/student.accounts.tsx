@@ -70,7 +70,20 @@ function ConnectBankButton({ onLinked }: { onLinked: () => void }) {
     }
   }, [exchangeFn, onLinked]);
 
-  const { open, ready } = usePlaidLink({ token: linkToken ?? "", onSuccess });
+  const onExit = useCallback((err: any, metadata: any) => {
+    if (err) {
+      console.error("[Plaid Link exit]", JSON.stringify({
+        error_type:      err?.error_type,
+        error_code:      err?.error_code,
+        error_message:   err?.error_message,
+        request_id:      metadata?.request_id,
+        link_session_id: metadata?.link_session_id,
+        institution_id:  metadata?.institution?.institution_id,
+      }, null, 2));
+    }
+  }, []);
+
+  const { open, ready } = usePlaidLink({ token: linkToken ?? "", onSuccess, onExit });
 
   useEffect(() => {
     if (linkToken && ready) open();

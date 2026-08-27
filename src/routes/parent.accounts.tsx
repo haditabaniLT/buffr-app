@@ -90,9 +90,24 @@ function ConnectBankButton({ onLinked }: { onLinked: (justLinkedIds: string[]) =
     }
   }, [exchangeFn, onLinked]);
 
+  const onExit = useCallback((err: any, metadata: any) => {
+    if (err) {
+      // Log to console so you can copy the request_id for Plaid support
+      console.error("[Plaid Link exit]", JSON.stringify({
+        error_type:    err?.error_type,
+        error_code:    err?.error_code,
+        error_message: err?.error_message,
+        request_id:    metadata?.request_id,
+        link_session_id: metadata?.link_session_id,
+        institution_id:  metadata?.institution?.institution_id,
+      }, null, 2));
+    }
+  }, []);
+
   const { open, ready } = usePlaidLink({
     token: linkToken ?? "",
     onSuccess,
+    onExit,
   });
 
   useEffect(() => {

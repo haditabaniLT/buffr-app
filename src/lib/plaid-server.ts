@@ -191,6 +191,7 @@ export const createPlaidLinkToken = createServerFn({ method: "POST" })
       country_codes: ["US"],
       language: "en",
       webhook: webhookUrl,
+      link_customization_name: "default",
     });
     return { link_token: result.link_token };
   });
@@ -858,6 +859,7 @@ export const createPlaidLinkTokenForStudent = createServerFn({ method: "POST" })
       country_codes: ["US"],
       language: "en",
       webhook: WEBHOOK_EDGE_FN,
+      link_customization_name: "default",
     });
     return { link_token: result.link_token };
   });
