@@ -52,6 +52,26 @@ Deno.serve(async (req) => {
 
   // ── 1. Read raw body (must happen before any other await) ──────────────────
   const rawBody = await req.text();
+
+  // Debug: log env vars to verify secrets are set correctly
+  const plaidEnv = Deno.env.get("PLAID_ENV") ?? "(not set)";
+  const plaidClientId = Deno.env.get("PLAID_CLIENT_ID") ?? "(not set)";
+  const plaidSecret = Deno.env.get("PLAID_SECRET") ?? "(not set)";
+  log("info", "env check", {
+    PLAID_ENV: plaidEnv,
+    PLAID_CLIENT_ID: plaidClientId,
+    PLAID_SECRET_LENGTH: plaidSecret === "(not set)" ? "(not set)" : plaidSecret.length,
+    PLAID_SECRET_PREVIEW: plaidSecret === "(not set)" ? "(not set)" : `${plaidSecret.slice(0, 4)}...${plaidSecret.slice(-4)}`,
+  });
+
+  // Debug: log all incoming headers
+  const headers: Record<string, string> = {};
+  req.headers.forEach((value, key) => { headers[key] = value; });
+  log("info", "incoming headers", headers);
+
+  // Debug: log raw body
+  log("info", "raw body", { body: rawBody });
+
   log("info", "received request", { size_bytes: rawBody.length });
 
   // ── 2. Verify Plaid-Verification JWT ───────────────────────────────────────
