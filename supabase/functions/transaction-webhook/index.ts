@@ -89,6 +89,7 @@ Deno.serve(async (req) => {
     webhook_type?: string;
     webhook_code?: string;
     item_id?: string;
+    environment?: string;
     error?: unknown;
   } = {};
   try {
@@ -96,6 +97,12 @@ Deno.serve(async (req) => {
   } catch {
     log("error", "invalid JSON body");
     return json({ error: "Invalid JSON" }, 400);
+  }
+
+  // Drop sandbox webhooks — production only
+  if (payload.environment === "sandbox") {
+    log("warn", "ignored sandbox webhook", { item_id: payload.item_id ?? null, webhook_code: payload.webhook_code ?? null });
+    return json({ ok: true, ignored: "sandbox" });
   }
 
   const { webhook_type, webhook_code, item_id } = payload;

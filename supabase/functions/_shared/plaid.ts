@@ -438,7 +438,7 @@ export async function flagAndNotify(
   const [txnRes, merchantRes, accountRes] = await Promise.all([
     supabase
       .from("transactions")
-      .select("id, name, merchant_name, amount, owner_user_id, category, personal_finance_category")
+      .select("id, name, merchant_name, amount, owner_user_id, category, personal_finance_category, date")
       .in("id", txnIds)
       .eq("is_flagged", false),           // only re-check unflagged rows
     supabase
@@ -452,7 +452,17 @@ export async function flagAndNotify(
       .maybeSingle(),
   ]);
 
-  const txns      = (txnRes.data    ?? []) as Array<{ id: string; name: string | null; merchant_name: string | null; amount: number; owner_user_id: string | null; category: string[] | null; personal_finance_category: string | null }>;
+  // Only analyze transactions from the last 30 days to avoid AI exhaustion on initial historical sync
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const allTxns = (txnRes.data ?? []) as Array<{ id: string; name: string | null; merchant_name: string | null; amount: number; owner_user_id: string | null; category: string[] | null; personal_finance_category: string | null; date?: string }>;
+  const txns = allTxns.filter((t) => !t.date || t.date >= cutoffStr);
+
+  if (allTxns.length !== txns.length) {
+    console.log(`[flag] skipped ${allTxns.length - txns.length} historical transaction(s) older than 30 days`);
+  }
   const merchants = (merchantRes.data ?? []) as MerchantRow[];
   const accountData = accountRes.data as { linked_by_parent_id: string | null; owner_user_id: string | null } | null;
   // linked_by_parent_id is set when a parent linked the account; null when a child self-linked.
@@ -474,10 +484,17 @@ export async function flagAndNotify(
   let parentDbId: string | null  = parentId;
 
   const newlyFlagged: Array<{ id: string; name: string; amount: number; reason: string }> = [];
-  // Track which IDs were processed (matched or AI-flagged) so we can delete the rest
-  const processedIds = new Set<string>();
 
   for (const txn of txns) {
+    console.log(`[flag] txn=${txn.id}`, JSON.stringify({
+      merchant_name: txn.merchant_name ?? null,
+      name: txn.name ?? null,
+      amount: txn.amount,
+      date: txn.date ?? null,
+      category: txn.category ?? null,
+      personal_finance_category: txn.personal_finance_category ?? null,
+    }));
+
     const search = (txn.merchant_name || txn.name || "").toLowerCase().trim();
     if (!search) continue;
 
@@ -509,7 +526,7 @@ export async function flagAndNotify(
         console.log(`[flag] ai-check txn=${txn.id}`, JSON.stringify({
           verdict: ai ? "safe" : "ai_unavailable",
         }));
-        continue;
+        continue; // leave transaction in DB — safe transactions are kept
       }
 
       const safeCat = safeCategory(ai.category);
@@ -543,7 +560,6 @@ export async function flagAndNotify(
       continue;
     }
 
-    processedIds.add(txn.id);
     newlyFlagged.push({
       id:     txn.id,
       name:   txn.merchant_name || txn.name || "Unknown merchant",
@@ -552,23 +568,9 @@ export async function flagAndNotify(
     });
   }
 
-  // Remove transactions that matched neither the merchant list nor AI — keep DB clean.
-  const unflaggedIds = txns
-    .filter((t) => !processedIds.has(t.id) && (t.merchant_name || t.name)) // skip empty-search rows already skipped above
-    .map((t) => t.id);
-  if (unflaggedIds.length > 0) {
-    const { error: delErr } = await supabase
-      .from("transactions")
-      .delete()
-      .in("id", unflaggedIds);
-    if (delErr) console.error("flagAndNotify: cleanup delete error:", delErr);
-    else console.log(`[flag] cleaned ${unflaggedIds.length} non-flagged transaction(s)`);
-  }
-
   console.log(`[flag] summary`, JSON.stringify({
     checked:  txns.length,
     flagged:  newlyFlagged.length,
-    cleaned:  unflaggedIds.length,
     parent_found: !!parentDbId,
   }));
 
