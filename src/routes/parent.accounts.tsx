@@ -40,8 +40,8 @@ import {
   assignBankAccountOwner,
   deleteBankAccount,
   type BankAccountRow,
-} from "@/lib/plaid-server";
-import { getParentChildren, type ParentChildRow } from "@/lib/children-server";
+} from "@/lib/server/parent/accounts";
+import { getParentChildren, type ParentChildRow } from "@/lib/server/parent/children";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/parent/accounts")({ component: ParentAccounts });

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { adminListUsers, adminSetUserStatus, type AdminUserRow } from "@/lib/admin-server";
+import { adminListUsers, adminSetUserStatus, type AdminUserRow } from "@/lib/server/admin/users";
 import { toast } from "sonner";
 import { Ban, CheckCircle2, PauseCircle, User as UserIcon, Mail, Phone, Calendar } from "lucide-react";
 

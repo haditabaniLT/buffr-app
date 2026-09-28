@@ -1,9 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { requireParent } from "@/lib/server-helpers";
-
-const SUPABASE_URL         = process.env.SUPABASE_URL              ?? process.env.VITE_SUPABASE_URL ?? "";
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
 export type NotificationRow = {
   id: string;
@@ -46,20 +42,3 @@ export const markAllNotificationsRead = createServerFn({ method: "POST" })
     if (error) throw new Error((error as any).message);
     return { ok: true };
   });
-
-/** Internal helper — called server-side only (not a server function) */
-export async function insertNotification(opts: {
-  userId: string;
-  type: string;
-  title: string;
-  body: string;
-}) {
-  if (!SUPABASE_SERVICE_KEY) return;
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  await (admin.from("notifications") as any).insert({
-    user_id:    opts.userId,
-    type:       opts.type,
-    title:      opts.title,
-    body:       opts.body,
-  });
-}

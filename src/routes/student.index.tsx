@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
-import { listStudentTransactions, type TxRow } from "@/lib/transactions-server";
+import { listStudentTransactions, type TxRow } from "@/lib/server/child/transactions";
 import { dbTxToMock, type Transaction } from "@/lib/mock-data";
 import { PageHeader } from "@/components/AppShell";
 import { KpiCard } from "@/components/KpiCard";

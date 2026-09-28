@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { adminListSmsLogs, type SmsLogRow } from "@/lib/transactions-server";
+import { adminListSmsLogs, type SmsLogRow } from "@/lib/server/admin/sms";
 import { PageHeader } from "@/components/AppShell";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";

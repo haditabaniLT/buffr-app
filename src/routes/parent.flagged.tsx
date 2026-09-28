@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listParentTransactions, type TxRow } from "@/lib/transactions-server";
+import { listParentTransactions, type TxRow } from "@/lib/server/parent/transactions";
 import { dbTxToMock, type Transaction } from "@/lib/mock-data";
 import { PageHeader } from "@/components/AppShell";
 import { TransactionsTable } from "@/components/TransactionsTable";

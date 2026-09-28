@@ -43,7 +43,7 @@ import {
   updateMerchant,
   deleteMerchant,
   type MerchantRow,
-} from "@/lib/admin-server";
+} from "@/lib/server/admin/merchants";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/merchants")({ component: AdminMerchants });

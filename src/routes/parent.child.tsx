@@ -4,13 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { usePlaidLink } from "react-plaid-link";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { createParentChild, getParentChildren, type ParentChildRow } from "@/lib/children-server";
+import { createParentChild, getParentChildren, type ParentChildRow } from "@/lib/server/parent/children";
 import {
   createPlaidLinkToken,
   exchangePlaidPublicToken,
   assignBankAccountOwner,
-} from "@/lib/plaid-server";
-import { listParentTransactions, type TxRow } from "@/lib/transactions-server";
+} from "@/lib/server/parent/accounts";
+import { listParentTransactions, type TxRow } from "@/lib/server/parent/transactions";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";

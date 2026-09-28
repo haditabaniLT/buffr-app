@@ -6,7 +6,7 @@ import {
   listParentNotifications,
   markAllNotificationsRead,
   type NotificationRow,
-} from "@/lib/notifications-server";
+} from "@/lib/server/parent/notifications";
 
 async function getToken() {
   return (await supabase.auth.getSession()).data.session?.access_token ?? null;
