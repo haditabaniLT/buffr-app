@@ -54,6 +54,12 @@ export async function withRetry<T>(op: () => Promise<T>, label = "operation", at
 
 type AppRole = "admin" | "parent" | "child";
 
+function disabledAccountMessage(status: string | null | undefined): string | null {
+  if (status === "blocked") return "Your account has been blocked. Please contact support.";
+  if (status === "suspended") return "Your account is suspended. Please contact support.";
+  return null;
+}
+
 async function requireRole(accessToken: string, role: AppRole) {
   if (!accessToken) throw new Error("Please sign in again.");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -75,11 +81,25 @@ async function requireRole(accessToken: string, role: AppRole) {
     return data;
   }, "verify your session");
 
-  const userRole = await withRetry(async () => {
-    const { data, error } = await supabaseAdmin.rpc("get_primary_role", { _user_id: authData.user.id });
-    if (error) throw new Error(extractMessage(error, "Could not determine user role."));
-    return data;
-  }, "verify your role");
+  const [userRole, accountStatus] = await Promise.all([
+    withRetry(async () => {
+      const { data, error } = await supabaseAdmin.rpc("get_primary_role", { _user_id: authData.user.id });
+      if (error) throw new Error(extractMessage(error, "Could not determine user role."));
+      return data;
+    }, "verify your role"),
+    withRetry(async () => {
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .select("status")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+      if (error) throw new Error(extractMessage(error, "Could not verify your account."));
+      return data?.status ?? null;
+    }, "verify your account"),
+  ]);
+
+  const disabled = disabledAccountMessage(accountStatus);
+  if (disabled) throw new Error(disabled);
 
   if (userRole !== role) {
     throw new Error(

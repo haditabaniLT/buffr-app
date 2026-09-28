@@ -49,20 +49,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [faqs, setFaqs] = useState<FAQ[]>(mockFAQs);
   const [extraChildIds, setExtraChildIds] = useState<string[]>([]);
 
-  // Map authenticated Supabase user -> mock User shape so existing pages keep working.
   const currentUser: User | null = useMemo(() => {
     if (!user || !profile || !role) return null;
-    const demoBase = mockUsers.find((u) => u.role === role);
-    const baseChildIds = role === "parent" ? demoBase?.childIds ?? [] : undefined;
     return {
       id: user.id,
       name: profile.name || user.email?.split("@")[0] || "User",
       email: profile.email || user.email || "",
       role,
-      status: "active",
+      status: profile.status ?? "active",
       createdAt: user.created_at ?? new Date().toISOString(),
-      childIds: role === "parent" ? [...(baseChildIds ?? []), ...extraChildIds] : undefined,
-      parentId: role === "child" ? demoBase?.parentId : (profile.parent_id ?? undefined),
+      childIds: role === "parent" ? extraChildIds : undefined,
+      parentId: profile.parent_id ?? undefined,
     };
   }, [user, profile, role, extraChildIds]);
 
