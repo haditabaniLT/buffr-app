@@ -1,5 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
-import { requireParent } from "@/lib/server-helpers";
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
 
 export type NotificationRow = {
   id: string;
@@ -10,13 +9,9 @@ export type NotificationRow = {
   created_at: string;
 };
 
-export const listParentNotifications = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const listParentNotifications = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("notifications")
       .select("id, type, title, body, read, created_at")
@@ -27,13 +22,9 @@ export const listParentNotifications = createServerFn({ method: "POST" })
     return { notifications: (rows ?? []) as NotificationRow[] };
   });
 
-export const markAllNotificationsRead = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const markAllNotificationsRead = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
     const { error } = await (supabaseAdmin as any)
       .from("notifications")
       .update({ read: true })

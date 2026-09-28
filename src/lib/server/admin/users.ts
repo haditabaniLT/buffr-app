@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireAdmin } from "@/lib/server-helpers";
+import { createAdminServerFn } from "@/lib/server/admin/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 export type AdminUserRow = {
   id: string;
@@ -13,13 +13,9 @@ export type AdminUserRow = {
   created_at: string;
 };
 
-export const adminListUsers = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+export const adminListUsers = createAdminServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = context;
     const rows = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin.rpc("admin_list_users");
       if (error) throw error;
@@ -28,10 +24,9 @@ export const adminListUsers = createServerFn({ method: "POST" })
     return { users: rows as AdminUserRow[] };
   });
 
-export const adminSetUserStatus = createServerFn({ method: "POST" })
+export const adminSetUserStatus = createAdminServerFn()
   .inputValidator(
     (input: { accessToken: string; userId: string; status: "active" | "suspended" | "blocked" }) => {
-      if (!input?.accessToken) throw new Error("Please sign in again.");
       if (!input.userId) throw new Error("Missing user id.");
       if (!["active", "suspended", "blocked"].includes(input.status)) {
         throw new Error("Invalid status.");
@@ -39,8 +34,8 @@ export const adminSetUserStatus = createServerFn({ method: "POST" })
       return input;
     },
   )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = context;
 
     const updated = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin

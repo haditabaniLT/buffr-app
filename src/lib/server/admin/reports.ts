@@ -1,5 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
-import { requireAdmin } from "@/lib/server-helpers";
+import { createAdminServerFn } from "@/lib/server/admin/server-fn";
 
 // ---------------------------------------------------------------------------
 // Reports
@@ -26,13 +25,9 @@ export type ReportStats = {
   userGrowth: Array<{ month: string; count: number }>;
 };
 
-export const adminGetReports = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+export const adminGetReports = createAdminServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = context;
 
     const [usersRes, txRes, smsRes, merchantsRes] = await Promise.all([
       supabaseAdmin.rpc("admin_list_users"),          // returns id, role, status, created_at

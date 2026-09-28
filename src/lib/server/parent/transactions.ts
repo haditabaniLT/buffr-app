@@ -1,5 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
-import { requireParent } from "@/lib/server-helpers";
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
 
 export type TxRow = {
   id: string;
@@ -21,13 +20,9 @@ export type TxRow = {
 };
 
 // Parent: own flagged transactions + all children's flagged transactions.
-export const listParentTransactions = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const listParentTransactions = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     // Fetch parent's own name + all children's IDs and names in one query
     const { data: users, error: usersErr } = await supabaseAdmin

@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireAdmin } from "@/lib/server-helpers";
+import { createAdminServerFn } from "@/lib/server/admin/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 // ---------- Merchants ----------
 export type MerchantRow = {
@@ -12,13 +12,9 @@ export type MerchantRow = {
   updated_at: string;
 };
 
-export const listMerchants = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+export const listMerchants = createAdminServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = context;
     const rows = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin
         .from("merchants")
@@ -54,13 +50,12 @@ function validateMerchant(m: Partial<MerchantInput>): MerchantInput {
   };
 }
 
-export const createMerchant = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string } & Partial<MerchantInput>) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
+export const createMerchant = createAdminServerFn()
+  .inputValidator((input: Partial<MerchantInput>) => {
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = context;
     const payload = validateMerchant(data);
     const row = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin
@@ -74,16 +69,15 @@ export const createMerchant = createServerFn({ method: "POST" })
     return { merchant: row as MerchantRow };
   });
 
-export const updateMerchant = createServerFn({ method: "POST" })
+export const updateMerchant = createAdminServerFn()
   .inputValidator(
     (input: { accessToken: string; id: string } & Partial<MerchantInput>) => {
-      if (!input?.accessToken) throw new Error("Please sign in again.");
       if (!input.id) throw new Error("Missing merchant id.");
       return input;
     },
   )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = context;
     const payload = validateMerchant(data);
     const row = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin
@@ -98,14 +92,13 @@ export const updateMerchant = createServerFn({ method: "POST" })
     return { merchant: row as MerchantRow };
   });
 
-export const deleteMerchant = createServerFn({ method: "POST" })
+export const deleteMerchant = createAdminServerFn()
   .inputValidator((input: { accessToken: string; id: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input.id) throw new Error("Missing merchant id.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = context;
     await withRetry(async () => {
       const { error } = await supabaseAdmin.from("merchants").delete().eq("id", data.id);
       if (error) throw error;

@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireParent } from "@/lib/server-helpers";
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 export type ParentChildRow = {
   id: string;
@@ -13,7 +13,6 @@ export type ParentChildRow = {
 };
 
 type CreateChildInput = {
-  accessToken: string;
   name: string;
   email: string;
   dob: string;
@@ -44,7 +43,6 @@ function validateInput(input: CreateChildInput) {
   const email = normalizeEmail(input.email ?? "");
   const age = calcAge(input.dob);
 
-  if (!input.accessToken) throw new Error("Please sign in again before adding a child.");
   if (!name) throw new Error("Full name is required.");
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address.");
   if (age <= 0) throw new Error("Enter a valid date of birth.");
@@ -52,13 +50,9 @@ function validateInput(input: CreateChildInput) {
   return { name, email, age };
 }
 
-export const getParentChildren = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again before loading children.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const getParentChildren = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     const [childrenResult, invitationsResult] = await Promise.all([
       withRetry(async () => {
@@ -106,11 +100,11 @@ export const getParentChildren = createServerFn({ method: "POST" })
     return { children: [...linked, ...invited].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) };
   });
 
-export const createParentChild = createServerFn({ method: "POST" })
+export const createParentChild = createParentServerFn()
   .inputValidator((input: CreateChildInput) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { name, email, age } = validateInput(data);
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+    const { supabaseAdmin, parentId } = context;
 
     if (age >= 18) {
       const token = generateToken();

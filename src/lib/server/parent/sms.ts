@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireParent } from "@/lib/server-helpers";
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 export type SmsLogRow = {
   id: string;
@@ -12,13 +12,9 @@ export type SmsLogRow = {
   created_at: string;
 };
 
-export const listSmsLogs = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const listSmsLogs = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     const rows = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin

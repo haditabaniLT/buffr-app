@@ -1,5 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
-import { requireChild } from "@/lib/server-helpers";
+import { createChildServerFn } from "@/lib/server/child/server-fn";
 
 export type TxRow = {
   id: string;
@@ -23,13 +22,9 @@ export type TxRow = {
 // Child: own flagged transactions only.
 // Only flagged transactions are stored; always filter to is_flagged = true
 // so any non-flagged rows written by the edge function before cleanup don't leak.
-export const listStudentTransactions = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, childId } = await requireChild(data.accessToken);
+export const listStudentTransactions = createChildServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, childId } = context;
 
     const { data: rows, error } = await supabaseAdmin
       .from("transactions")

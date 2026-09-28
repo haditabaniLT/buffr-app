@@ -65,18 +65,18 @@ Public routes: `/`, `/login`, `/signup`, `/forgot`, `/reset-password`, `/onboard
 
 Client auth uses the publishable Supabase client (`@/integrations/supabase/client`) inside `AuthProvider`. The session, profile, and role are cached in `localStorage` under `buffr.profile`, `buffr.role`, and `buffr.uid`. Role comes from the `get_primary_role` RPC, not from a client-supplied field.
 
-Privileged work goes through `createServerFn` under `src/lib/server/<role>/<service>.ts`. A function used by more than one role is reimplemented in each role's folder so the role check and the query stay together. Do not import a parent service from a child or admin module. The client passes the current access token:
+Privileged work goes through a role factory under `src/lib/server/<role>/<service>.ts`: `createParentServerFn`, `createAdminServerFn`, `createChildServerFn`, or `createAdultChildServerFn`. A function used by more than one role is reimplemented in each role's folder. Do not import a parent service from a child or admin module. The client passes the current access token:
 
 ```ts
 const token = (await supabase.auth.getSession()).data.session?.access_token ?? null;
 const result = await someServerFn({ data: { accessToken: token } });
 ```
 
-On the server, validate input with `.inputValidator(...)`, then call `requireParent`, `requireAdmin`, `requireChild`, or `requireAdultChild` from `src/lib/server-helpers.ts` before touching data. Those helpers verify the JWT with the service-role client, reject `suspended` and `blocked` accounts, and check `get_primary_role`. `requireAdultChild` also rejects `users.is_minor` — minors cannot link or remove their own bank accounts. Do not let a client update `role`, `status`, `is_minor`, or `date_of_birth`; the `users_block_sensitive_updates` trigger rejects those writes from non-admins.
+The factory checks that token and calls `requireParent`, `requireAdmin`, `requireChild`, or `requireAdultChild` before the handler runs. The handler receives `context` with `supabaseAdmin` and that role's user id. Add `.inputValidator(...)` only for the rest of the payload. Those helpers verify the JWT with the service-role client, reject `suspended` and `blocked` accounts, and check `get_primary_role`. `createAdultChildServerFn` also rejects `users.is_minor` — minors cannot link or remove their own bank accounts. Do not let a client update `role`, `status`, `is_minor`, or `date_of_birth`; the `users_block_sensitive_updates` trigger rejects those writes from non-admins.
 
 `supabaseAdmin` (`client.server.ts`) bypasses RLS. Import it only inside server functions, server routes, or `*.server.ts` files, and only after a role check. Never import it from a client component.
 
-`requireSupabaseAuth` in `auth-middleware.ts` is generated and unused. New code should follow the `accessToken` + `require*` pattern already used by the server modules.
+`requireSupabaseAuth` in `auth-middleware.ts` is generated and unused. New privileged functions should use the role factory for that folder. `getAuthSnapshot` and invite acceptance stay on `createServerFn` because they run before a role is known.
 
 Wrap Supabase calls that can fail transiently with `withRetry`. Return plain objects or throw `Error` with a message safe to show the user. Use `extractMessage` for PostgREST errors.
 

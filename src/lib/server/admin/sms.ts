@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireAdmin } from "@/lib/server-helpers";
+import { createAdminServerFn } from "@/lib/server/admin/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 export type SmsLogRow = {
   id: string;
@@ -12,13 +12,9 @@ export type SmsLogRow = {
   created_at: string;
 };
 
-export const adminListSmsLogs = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+export const adminListSmsLogs = createAdminServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = context;
 
     const rows = await withRetry(async () => {
       const { data: r, error } = await supabaseAdmin

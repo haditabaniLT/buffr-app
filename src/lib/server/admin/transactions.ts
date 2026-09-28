@@ -1,5 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
-import { requireAdmin } from "@/lib/server-helpers";
+import { createAdminServerFn } from "@/lib/server/admin/server-fn";
 
 // ---------------------------------------------------------------------------
 // Flagged transactions — full list for monitoring page
@@ -17,13 +16,9 @@ export type AdminFlaggedTxRow = {
   owner_user_id: string | null;
 };
 
-export const adminListFlaggedTransactions = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await requireAdmin(data.accessToken);
+export const adminListFlaggedTransactions = createAdminServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = context;
 
     const { data: rows, error } = await supabaseAdmin
       .from("transactions")

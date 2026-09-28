@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireChild, requireAdultChild } from "@/lib/server-helpers";
+import { createChildServerFn, createAdultChildServerFn } from "@/lib/server/child/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 const PLAID_BASE =
   process.env.PLAID_ENV === "production"
@@ -33,7 +33,6 @@ async function plaidPost<T = any>(path: string, body: Record<string, unknown>): 
   }
   return data as T;
 }
-
 
 async function sendTwilioSms(to: string, body: string) {
   const sid   = process.env.TWILIO_ACCOUNT_SID;
@@ -74,13 +73,9 @@ export type BankAccountRow = {
 };
 
 // Child bank accounts. Scoped to the signed-in child. Adults may link and remove their own accounts.
-export const createPlaidLinkTokenForStudent = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { childId } = await requireAdultChild(data.accessToken);
+export const createPlaidLinkTokenForStudent = createAdultChildServerFn()
+  .handler(async ({ context }) => {
+    const { childId } = context;
     const creds = plaidCreds();
     const result = await plaidPost<{ link_token: string }>("/link/token/create", {
       ...creds,
@@ -95,14 +90,13 @@ export const createPlaidLinkTokenForStudent = createServerFn({ method: "POST" })
     return { link_token: result.link_token };
   });
 
-export const exchangePlaidPublicTokenForStudent = createServerFn({ method: "POST" })
+export const exchangePlaidPublicTokenForStudent = createAdultChildServerFn()
   .inputValidator((input: { accessToken: string; publicToken: string; institutionName?: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input?.publicToken) throw new Error("Missing Plaid public token.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, childId } = await requireAdultChild(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, childId } = context;
     const creds = plaidCreds();
 
     const exchange = await plaidPost<{ access_token: string; item_id: string }>(
@@ -180,13 +174,9 @@ export const exchangePlaidPublicTokenForStudent = createServerFn({ method: "POST
     return { accounts: inserted };
   });
 
-export const listStudentBankAccounts = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, childId } = await requireChild(data.accessToken);
+export const listStudentBankAccounts = createChildServerFn()
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, childId } = context;
 
     const [accounts, userProfile] = await Promise.all([
       withRetry(async () => {
@@ -215,14 +205,13 @@ export const listStudentBankAccounts = createServerFn({ method: "POST" })
     };
   });
 
-export const deleteStudentBankAccount = createServerFn({ method: "POST" })
+export const deleteStudentBankAccount = createAdultChildServerFn()
   .inputValidator((input: { accessToken: string; accountId: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input?.accountId) throw new Error("Missing account ID.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, childId } = await requireAdultChild(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, childId } = context;
 
     await withRetry(async () => {
       const { error } = await supabaseAdmin

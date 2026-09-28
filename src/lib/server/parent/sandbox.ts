@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireParent } from "@/lib/server-helpers";
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const PLAID_BASE =
@@ -177,16 +177,15 @@ async function addDetectedMerchant(
  *
  * webhookCode defaults to SYNC_UPDATES_AVAILABLE.
  */
-export const fireSandboxWebhook = createServerFn({ method: "POST" })
+export const fireSandboxWebhook = createParentServerFn()
   .inputValidator(
     (input: { accessToken: string; plaidItemId: string; webhookCode?: string }) => {
-      if (!input?.accessToken) throw new Error("Please sign in again.");
       if (!input?.plaidItemId) throw new Error("Missing plaidItemId.");
       return input;
     },
   )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
     const creds = plaidCreds();
 
     const { data: childRows } = await supabaseAdmin
@@ -224,18 +223,17 @@ export const fireSandboxWebhook = createServerFn({ method: "POST" })
  * SYNC_UPDATES_AVAILABLE webhook so the transaction-webhook edge function
  * picks it up (sync → flag → SMS). Tests the real production webhook path.
  */
-export const injectAndFireWebhook = createServerFn({ method: "POST" })
+export const injectAndFireWebhook = createParentServerFn()
   .inputValidator(
     (input: { accessToken: string; plaidItemId: string; merchant: string; amount: number }) => {
-      if (!input?.accessToken) throw new Error("Please sign in again.");
       if (!input?.plaidItemId) throw new Error("Missing plaidItemId.");
       if (!input?.merchant?.trim()) throw new Error("Merchant name is required.");
       if (!input?.amount || input.amount <= 0) throw new Error("Amount must be positive.");
       return input;
     },
   )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
     const creds = plaidCreds();
 
     const { data: childRows } = await supabaseAdmin
@@ -290,22 +288,20 @@ export const injectAndFireWebhook = createServerFn({ method: "POST" })
  * Only works for items created with the user_transactions_dynamic test username.
  * After injecting, Plaid fires webhooks automatically (edge fn picks them up).
  */
-export const createSandboxTransactions = createServerFn({ method: "POST" })
+export const createSandboxTransactions = createParentServerFn()
   .inputValidator(
     (input: {
-      accessToken: string;
       plaidItemId: string;
       transactions: Array<{ amount: number; date: string; description: string }>;
     }) => {
-      if (!input?.accessToken) throw new Error("Please sign in again.");
       if (!input?.plaidItemId) throw new Error("Missing plaidItemId.");
       if (!input?.transactions?.length) throw new Error("Provide at least one transaction.");
       if (input.transactions.length > 10) throw new Error("Max 10 transactions per request.");
       return input;
     },
   )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
     const creds = plaidCreds();
 
     const { data: childRows } = await supabaseAdmin
@@ -368,14 +364,13 @@ export const createSandboxTransactions = createServerFn({ method: "POST" })
  * Manually trigger a /transactions/sync for an item (bypasses webhook).
  * Useful for the first sync after linking an account or during development.
  */
-export const syncTransactionsManually = createServerFn({ method: "POST" })
+export const syncTransactionsManually = createParentServerFn()
   .inputValidator((input: { accessToken: string; plaidItemId: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input?.plaidItemId) throw new Error("Missing plaidItemId.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
     const creds = plaidCreds();
 
     const { data: childRows } = await supabaseAdmin

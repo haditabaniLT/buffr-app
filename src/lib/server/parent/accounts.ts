@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireParent } from "@/lib/server-helpers";
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 const PLAID_BASE =
   process.env.PLAID_ENV === "production"
@@ -34,13 +34,9 @@ async function plaidPost<T = any>(path: string, body: Record<string, unknown>): 
   return data as T;
 }
 
-export const createPlaidLinkToken = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { parentId } = await requireParent(data.accessToken);
+export const createPlaidLinkToken = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { parentId } = context;
     const creds = plaidCreds();
     // Points to the Supabase Edge Function which verifies the Plaid JWT
     // and calls /transactions/sync automatically on every webhook event.
@@ -58,14 +54,13 @@ export const createPlaidLinkToken = createServerFn({ method: "POST" })
     return { link_token: result.link_token };
   });
 
-export const exchangePlaidPublicToken = createServerFn({ method: "POST" })
+export const exchangePlaidPublicToken = createParentServerFn()
   .inputValidator((input: { accessToken: string; publicToken: string; institutionName?: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input?.publicToken) throw new Error("Missing Plaid public token.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
     const creds = plaidCreds();
 
     // 1. Exchange public_token -> access_token + item_id
@@ -124,13 +119,9 @@ export type BankAccountRow = {
   created_at: string;
 };
 
-export const listParentBankAccounts = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const listParentBankAccounts = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     // All accounts visible to this parent = those owned by the parent or any of
     // their children (covers parent-linked, child self-linked, and reassigned accounts).
@@ -168,14 +159,13 @@ export const listParentBankAccounts = createServerFn({ method: "POST" })
     };
   });
 
-export const assignBankAccountOwner = createServerFn({ method: "POST" })
+export const assignBankAccountOwner = createParentServerFn()
   .inputValidator((input: { accessToken: string; accountId: string; ownerUserId: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input?.accountId || !input?.ownerUserId) throw new Error("Missing account or owner.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     // Fetch all children to build the family ID set
     const { data: childRows, error: childErr } = await supabaseAdmin
@@ -206,14 +196,13 @@ export const assignBankAccountOwner = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const deleteBankAccount = createServerFn({ method: "POST" })
+export const deleteBankAccount = createParentServerFn()
   .inputValidator((input: { accessToken: string; accountId: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again.");
     if (!input?.accountId) throw new Error("Missing account id.");
     return input;
   })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     const { data: childRows } = await supabaseAdmin
       .from("users").select("id").eq("parent_id", parentId);
