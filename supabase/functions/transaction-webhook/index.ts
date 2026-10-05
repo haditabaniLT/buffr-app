@@ -134,6 +134,11 @@ Deno.serve(async (req) => {
     "HISTORICAL_UPDATE",
   ]);
 
+  // Historical/initial webhooks: sync to DB but never flag — these are past
+  // transactions the account already had before being linked to Buffr.
+  // Only ongoing updates (SYNC_UPDATES_AVAILABLE, DEFAULT_UPDATE) trigger alerts.
+  const FLAG_CODES = new Set(["SYNC_UPDATES_AVAILABLE", "DEFAULT_UPDATE"]);
+
   let syncResult = null;
 
   if (webhook_type === "TRANSACTIONS" && item_id && TRANSACTION_CODES.has(webhook_code ?? "")) {
@@ -173,8 +178,9 @@ Deno.serve(async (req) => {
           new_ids:  syncResult.addedIds?.length ?? 0,
         });
 
-        // Flag merchant matches + send SMS to parent for each new flagged txn
-        if (syncResult.addedIds?.length) {
+        // Flag merchant matches + send SMS — only for ongoing updates, not historical backfill
+        const shouldFlag = FLAG_CODES.has(webhook_code ?? "");
+        if (syncResult.addedIds?.length && shouldFlag) {
           log("info", "flagging pipeline starting", { candidates: syncResult.addedIds.length });
           const flagged = await flagAndNotify(supabase, syncResult.addedIds, item_id);
           log("info", "flagging pipeline complete", {
@@ -182,6 +188,8 @@ Deno.serve(async (req) => {
             flagged,
             cleaned: syncResult.addedIds.length - flagged,
           });
+        } else if (syncResult.addedIds?.length && !shouldFlag) {
+          log("info", "historical sync — flagging skipped", { webhook_code, stored: syncResult.addedIds.length });
         } else {
           log("info", "no new transactions to flag");
         }
