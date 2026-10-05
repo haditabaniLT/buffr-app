@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { getAuthSnapshot } from "@/lib/auth-server";
+import { getAuthSnapshot } from "@/lib/server/auth";
 import type { Session, User as SupaUser } from "@supabase/supabase-js";
 
 export type AppRole = "admin" | "parent" | "child";
@@ -100,10 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const lastFetchedUid = useRef<string | null>(null);
+  const blockReason = useRef<string | null>(null);
 
   // Fetch profile + role and persist to localStorage. Returns the resolved role.
   // Throws on hard DB errors so callers can surface them.
   const loadProfileAndRole = async (uid: string, accessToken?: string): Promise<AppRole | null> => {
+    blockReason.current = null;
     const withTimeout = <T,>(p: PromiseLike<T>, ms = 8000): Promise<T> =>
       new Promise((resolve, reject) => {
         const t = setTimeout(
@@ -122,7 +124,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       });
 
-    const applySnapshot = (nextProfile: Profile | null, nextRole: AppRole | null) => {
+    const applySnapshot = async (nextProfile: Profile | null, nextRole: AppRole | null) => {
+      if (nextProfile?.status === "blocked" || nextProfile?.status === "suspended") {
+        const msg =
+          nextProfile.status === "blocked"
+            ? "Your account has been blocked. Please contact support."
+            : "Your account is suspended. Please contact support.";
+        blockReason.current = msg;
+        clearCache();
+        setProfile(null);
+        setRole(null);
+        setUser(null);
+        setSession(null);
+        setAuthError(msg);
+        lastFetchedUid.current = null;
+        await supabase.auth.signOut();
+        return null;
+      }
       setProfile(nextProfile);
       setRole(nextRole);
       setAuthError(null);
@@ -141,13 +159,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (snapshot && (snapshot as { ok?: boolean }).ok !== false) {
           return applySnapshot(snapshot.profile as Profile | null, snapshot.role as AppRole | null);
         }
-        if ((snapshot as { code?: string } | null)?.code === "INVALID_SESSION") {
+        const snapshotCode = (snapshot as { code?: string; message?: string } | null)?.code;
+        if (snapshotCode === "INVALID_SESSION" || snapshotCode === "ACCOUNT_DISABLED") {
           clearCache();
           setProfile(null);
           setRole(null);
           setUser(null);
           setSession(null);
           lastFetchedUid.current = null;
+          if (snapshotCode === "ACCOUNT_DISABLED") {
+            const msg =
+              (snapshot as { message?: string }).message ??
+              "Your account is suspended. Please contact support.";
+            blockReason.current = msg;
+            setAuthError(msg);
+          }
           await supabase.auth.signOut();
           return null;
         }
@@ -302,22 +328,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Eagerly load role so the caller can navigate to the right dashboard immediately.
         try {
           const r = await loadProfileAndRole(data.user.id, data.session?.access_token);
-          // Block suspended / blocked accounts at sign-in.
-          // Re-read the freshly cached profile from state via loadProfileAndRole's snapshot.
-          const status = (await supabase.from("users").select("status").eq("id", data.user.id).maybeSingle())
-            .data?.status as "active" | "suspended" | "blocked" | undefined;
-          if (status === "blocked" || status === "suspended") {
-            await supabase.auth.signOut();
-            clearCache();
-            setProfile(null);
-            setRole(null);
-            const msg =
-              status === "blocked"
-                ? "Your account has been blocked. Please contact support."
-                : "Your account is suspended. Please contact support.";
-            setAuthError(msg);
-            return { error: new Error(msg), role: null };
-          }
+          if (blockReason.current) return { error: new Error(blockReason.current), role: null };
+          if (!r) return { error: new Error("Please sign in again."), role: null };
           return { error: null, role: r };
         } catch (e) {
           console.error("[auth] role lookup failed after sign in:", e);

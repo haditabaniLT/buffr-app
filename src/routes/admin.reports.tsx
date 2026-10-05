@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { adminGetReports, type ReportStats } from "@/lib/admin-server";
+import { adminGetReports, type ReportStats } from "@/lib/server/admin/reports";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";

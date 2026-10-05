@@ -1,32 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { withRetry, requireParent } from "./server-helpers";
-
-// Validates an invite token server-side and returns the associated email.
-// Account creation is intentionally left to the client (supabase.auth.signUp)
-// so Supabase sends a real verification email through its standard email flow.
-// The handle_new_user trigger detects the pending invite and assigns 'child' role.
-export const createInvitedChild = createServerFn({ method: "POST" })
-  .inputValidator((input: { token: string; name: string; password: string }) => {
-    if (!input?.token) throw new Error("Missing invitation token.");
-    if (!input.name?.trim()) throw new Error("Full name is required.");
-    if (!input.password || input.password.length < 6) throw new Error("Password must be at least 6 characters.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // Validate the token exists and is still pending
-    const { data: rows, error: tokenErr } = await supabaseAdmin.rpc("get_invitation_by_token", { _token: data.token });
-    if (tokenErr || !rows?.length) throw new Error("Invalid or expired invitation.");
-    const invite = rows[0] as { email: string; status: string; expires_at: string };
-    if (invite.status !== "pending") throw new Error("This invitation has already been used.");
-    if (new Date(invite.expires_at) < new Date()) throw new Error("This invitation has expired.");
-
-    // Return email so the client can call supabase.auth.signUp() with it.
-    // We do NOT create the user here — admin.createUser() does not send a
-    // verification email. The client signUp() flow does.
-    return { email: invite.email };
-  });
+import { createParentServerFn } from "@/lib/server/parent/server-fn";
+import { withRetry } from "@/lib/server-helpers";
 
 export type ParentChildRow = {
   id: string;
@@ -40,7 +13,6 @@ export type ParentChildRow = {
 };
 
 type CreateChildInput = {
-  accessToken: string;
   name: string;
   email: string;
   dob: string;
@@ -71,7 +43,6 @@ function validateInput(input: CreateChildInput) {
   const email = normalizeEmail(input.email ?? "");
   const age = calcAge(input.dob);
 
-  if (!input.accessToken) throw new Error("Please sign in again before adding a child.");
   if (!name) throw new Error("Full name is required.");
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address.");
   if (age <= 0) throw new Error("Enter a valid date of birth.");
@@ -79,13 +50,9 @@ function validateInput(input: CreateChildInput) {
   return { name, email, age };
 }
 
-export const getParentChildren = createServerFn({ method: "POST" })
-  .inputValidator((input: { accessToken: string }) => {
-    if (!input?.accessToken) throw new Error("Please sign in again before loading children.");
-    return input;
-  })
-  .handler(async ({ data }) => {
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+export const getParentChildren = createParentServerFn()
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, parentId } = context;
 
     const [childrenResult, invitationsResult] = await Promise.all([
       withRetry(async () => {
@@ -133,11 +100,11 @@ export const getParentChildren = createServerFn({ method: "POST" })
     return { children: [...linked, ...invited].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) };
   });
 
-export const createParentChild = createServerFn({ method: "POST" })
+export const createParentChild = createParentServerFn()
   .inputValidator((input: CreateChildInput) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { name, email, age } = validateInput(data);
-    const { supabaseAdmin, parentId } = await requireParent(data.accessToken);
+    const { supabaseAdmin, parentId } = context;
 
     if (age >= 18) {
       const token = generateToken();

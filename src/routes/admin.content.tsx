@@ -3,9 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   adminListFaqs, adminCreateFaq, adminUpdateFaq, adminDeleteFaq,
+  type FaqRow,
+} from "@/lib/server/admin/faqs";
+import {
   adminListContentPages, adminUpdateContentPage,
-  type FaqRow, type ContentPageRow,
-} from "@/lib/admin-server";
+  type ContentPageRow,
+} from "@/lib/server/admin/content";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";

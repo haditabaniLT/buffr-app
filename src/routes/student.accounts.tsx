@@ -24,7 +24,7 @@ import {
   listStudentBankAccounts,
   deleteStudentBankAccount,
   type BankAccountRow,
-} from "@/lib/plaid-server";
+} from "@/lib/server/child/accounts";
 
 export const Route = createFileRoute("/student/accounts")({ component: StudentAccounts });
 

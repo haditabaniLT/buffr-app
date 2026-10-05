@@ -60,7 +60,24 @@ export type FAQ = { id: string; question: string; answer: string };
 
 // ── Adapter: convert a real DB transaction row → Transaction shape ──────────
 // Keeps existing TransactionsTable / dashboard components working unchanged.
-import type { TxRow } from "./transactions-server";
+type TxRow = {
+  id: string;
+  name: string | null;
+  merchant_name: string | null;
+  amount: number;
+  date: string;
+  pending: boolean;
+  is_flagged: boolean;
+  flag_reason: string | null;
+  flag_category: string | null;
+  category: string[];
+  iso_currency_code: string;
+  personal_finance_category: string | null;
+  bank_account_id: string | null;
+  owner_user_id: string | null;
+  owner_name: string | null;
+  plaid_item_id: string;
+};
 
 export function dbTxToMock(t: TxRow): Transaction {
   return {

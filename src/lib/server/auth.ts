@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { isTransient, withRetry } from "./server-helpers";
+import { isTransient, withRetry } from "@/lib/server-helpers";
 
 type AppRole = "admin" | "parent" | "child";
 
@@ -17,6 +17,7 @@ function normalizeRole(value: unknown): AppRole | null {
   return value === "admin" || value === "parent" || value === "child" ? value : null;
 }
 
+// Session bootstrap. The caller does not know the role yet — this function is how the app learns it.
 export const getAuthSnapshot = createServerFn({ method: "POST" })
   .inputValidator((input: { accessToken: string }) => {
     if (!input?.accessToken) throw new Error("Missing session token");
@@ -51,9 +52,24 @@ export const getAuthSnapshot = createServerFn({ method: "POST" })
         }),
       ]);
 
+      const profile = (profileResult.data as ProfileSnapshot | null) ?? null;
+      if (profile?.status === "blocked" || profile?.status === "suspended") {
+        return {
+          ok: false as const,
+          transient: false,
+          code: "ACCOUNT_DISABLED" as const,
+          profile: null,
+          role: null,
+          message:
+            profile.status === "blocked"
+              ? "Your account has been blocked. Please contact support."
+              : "Your account is suspended. Please contact support.",
+        };
+      }
+
       return {
         ok: true as const,
-        profile: (profileResult.data as ProfileSnapshot | null) ?? null,
+        profile,
         role: normalizeRole(roleResult.data),
       };
     } catch (err) {
@@ -78,7 +94,7 @@ export const getAuthSnapshot = createServerFn({ method: "POST" })
           message: "Your session could not be verified. Please sign in again.",
         };
       }
-      console.error("[auth-server] snapshot failed:", err);
+      console.error("[auth] snapshot failed:", err);
       return {
         ok: false as const,
         transient: false,

@@ -13,14 +13,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
+import { listParentBankAccounts, type BankAccountRow } from "@/lib/server/parent/accounts";
 import {
-  listParentBankAccounts,
   fireSandboxWebhook,
   syncTransactionsManually,
   createSandboxTransactions,
   injectAndFireWebhook,
-  type BankAccountRow,
-} from "@/lib/plaid-server";
+} from "@/lib/server/parent/sandbox";
 import { PageHeader } from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

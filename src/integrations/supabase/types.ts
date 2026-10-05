@@ -117,6 +117,7 @@ export type Database = {
       content_pages: {
         Row: {
           body: string
+          created_at: string
           id: string
           slug: string
           title: string
@@ -124,6 +125,7 @@ export type Database = {
         }
         Insert: {
           body?: string
+          created_at?: string
           id?: string
           slug: string
           title: string
@@ -131,6 +133,7 @@ export type Database = {
         }
         Update: {
           body?: string
+          created_at?: string
           id?: string
           slug?: string
           title?: string
@@ -175,6 +178,7 @@ export type Database = {
           parent_id: string
           status: Database["public"]["Enums"]["invitation_status"]
           token: string
+          updated_at: string
         }
         Insert: {
           accepted_user_id?: string | null
@@ -185,6 +189,7 @@ export type Database = {
           parent_id: string
           status?: Database["public"]["Enums"]["invitation_status"]
           token: string
+          updated_at?: string
         }
         Update: {
           accepted_user_id?: string | null
@@ -195,6 +200,7 @@ export type Database = {
           parent_id?: string
           status?: Database["public"]["Enums"]["invitation_status"]
           token?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -244,6 +250,7 @@ export type Database = {
           read: boolean
           title: string
           type: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -253,6 +260,7 @@ export type Database = {
           read?: boolean
           title: string
           type: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -262,6 +270,7 @@ export type Database = {
           read?: boolean
           title?: string
           type?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -456,6 +465,7 @@ export type Database = {
           role: string
           sms_opted_out: boolean
           status: Database["public"]["Enums"]["user_status"]
+          updated_at: string
         }
         Insert: {
           avatar_url?: string | null
@@ -470,6 +480,7 @@ export type Database = {
           role?: string
           sms_opted_out?: boolean
           status?: Database["public"]["Enums"]["user_status"]
+          updated_at?: string
         }
         Update: {
           avatar_url?: string | null
@@ -484,6 +495,7 @@ export type Database = {
           role?: string
           sms_opted_out?: boolean
           status?: Database["public"]["Enums"]["user_status"]
+          updated_at?: string
         }
         Relationships: [
           {

@@ -11,7 +11,7 @@
  * Deploy:
  *   supabase functions deploy simulate-transaction
  *
- * Usage (from plaid-server.ts):
+ * Usage (from src/lib/server/parent/sandbox.ts):
  *   POST https://{ref}.supabase.co/functions/v1/simulate-transaction
  *   Headers: Authorization: Bearer <supabase-access-token>
  *   Body: { action: "fire_webhook" | "create_transactions", item_id, transactions? }
@@ -39,6 +39,10 @@ Deno.serve(async (req) => {
   }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+  if (Deno.env.get("PLAID_ENV") === "production") {
+    return json({ error: "Sandbox tools are disabled in production." }, 404);
+  }
+
   // ── Auth: verify caller is a parent/admin ──────────────────────────────────
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
@@ -51,6 +55,19 @@ Deno.serve(async (req) => {
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
   if (authErr || !user) return json({ error: "Unauthorized" }, 401);
+
+  const { data: caller, error: callerErr } = await supabase
+    .from("users")
+    .select("role, status")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (callerErr || !caller) return json({ error: "Unauthorized" }, 401);
+  if (caller.status === "suspended" || caller.status === "blocked") {
+    return json({ error: "Account is not active." }, 403);
+  }
+  if (caller.role !== "parent" && caller.role !== "admin") {
+    return json({ error: "Unauthorized" }, 403);
+  }
 
   // ── Parse body ─────────────────────────────────────────────────────────────
   let body: {

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { adminListFlaggedTransactions, type AdminFlaggedTxRow } from "@/lib/admin-server";
+import { adminListFlaggedTransactions, type AdminFlaggedTxRow } from "@/lib/server/admin/transactions";
 import { PageHeader } from "@/components/AppShell";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FlagBadge } from "@/components/FlagBadge";
