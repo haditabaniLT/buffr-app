@@ -1,5 +1,6 @@
 import { createChildServerFn, createAdultChildServerFn } from "@/lib/server/child/server-fn";
 import { withRetry } from "@/lib/server-helpers";
+import { sendSms } from "@/lib/server/twilio";
 
 const PLAID_BASE =
   process.env.PLAID_ENV === "production"
@@ -32,29 +33,6 @@ async function plaidPost<T = any>(path: string, body: Record<string, unknown>): 
     throw new Error(data?.error_message || `Plaid request failed (${res.status}).`);
   }
   return data as T;
-}
-
-async function sendTwilioSms(to: string, body: string) {
-  const sid   = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from  = process.env.TWILIO_FROM_NUMBER;
-  if (!sid || !token || !from) {
-    console.warn("[twilio] Not configured — SMS skipped.");
-    return { success: false };
-  }
-  const toNorm   = to.startsWith("+")   ? to   : `+1${to.replace(/\D/g, "")}`;
-  const fromNorm = from.startsWith("+") ? from : `+1${from.replace(/\D/g, "")}`;
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
-    },
-    body: new URLSearchParams({ To: toNorm, From: fromNorm, Body: body }).toString(),
-  });
-  const data: any = await res.json();
-  if (!res.ok) { console.error("[twilio] error:", data); return { success: false }; }
-  return { success: true, sid: data.sid as string };
 }
 
 export type BankAccountRow = {
@@ -153,7 +131,7 @@ export const exchangePlaidPublicTokenForStudent = createAdultChildServerFn()
         const institution = data.institutionName ?? "a bank account";
 
         if ((parentProfile as any)?.phone && !(parentProfile as any).sms_opted_out) {
-          await sendTwilioSms(
+          await sendSms(
             (parentProfile as any).phone,
             `Buffr: ${childName} has connected ${institution} and their account is now active. Log in to view their activity. Msg&data rates may apply. Reply STOP to opt out.`,
           );

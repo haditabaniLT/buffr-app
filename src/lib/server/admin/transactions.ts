@@ -14,6 +14,9 @@ export type AdminFlaggedTxRow = {
   flag_category: string | null;
   owner_name: string | null;
   owner_user_id: string | null;
+  alert_status: string | null;
+  alert_error: string | null;
+  alert_attempted_at: string | null;
 };
 
 export const adminListFlaggedTransactions = createAdminServerFn()
@@ -31,24 +34,45 @@ export const adminListFlaggedTransactions = createAdminServerFn()
 
     const txns: any[] = rows ?? [];
     const ownerIds = [...new Set(txns.map((t) => t.owner_user_id).filter(Boolean))];
-    let ownerMap = new Map<string, string>();
-    if (ownerIds.length > 0) {
-      const { data: owners } = await supabaseAdmin
-        .from("users").select("id, name").in("id", ownerIds);
-      ownerMap = new Map((owners ?? []).map((u: any) => [u.id, u.name]));
+    const txnIds = txns.map((t) => t.id as string);
+
+    const [ownersRes, attemptsRes] = await Promise.all([
+      ownerIds.length > 0
+        ? supabaseAdmin.from("users").select("id, name").in("id", ownerIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+      txnIds.length > 0
+        ? supabaseAdmin
+            .from("notification_attempts")
+            .select("transaction_id, status, error, attempted_at")
+            .eq("type", "sms")
+            .in("transaction_id", txnIds)
+            .order("attempted_at", { ascending: false })
+        : Promise.resolve({ data: [] as Array<{ transaction_id: string; status: string; error: string | null; attempted_at: string }> }),
+    ]);
+
+    const ownerMap = new Map((ownersRes.data ?? []).map((u: { id: string; name: string }) => [u.id, u.name]));
+    const latestAttempt = new Map<string, { status: string; error: string | null; attempted_at: string }>();
+    for (const attempt of attemptsRes.data ?? []) {
+      if (!latestAttempt.has(attempt.transaction_id)) latestAttempt.set(attempt.transaction_id, attempt);
     }
 
-    const transactions: AdminFlaggedTxRow[] = txns.map((t) => ({
-      id:             t.id,
-      merchant_name:  t.merchant_name,
-      name:           t.name,
-      amount:         Math.abs(t.amount),
-      date:           t.date,
-      flag_reason:    t.flag_reason,
-      flag_category:  t.flag_category,
-      owner_name:     ownerMap.get(t.owner_user_id) ?? null,
-      owner_user_id:  t.owner_user_id,
-    }));
+    const transactions: AdminFlaggedTxRow[] = txns.map((t) => {
+      const attempt = latestAttempt.get(t.id);
+      return {
+        id:             t.id,
+        merchant_name:  t.merchant_name,
+        name:           t.name,
+        amount:         Math.abs(t.amount),
+        date:           t.date,
+        flag_reason:    t.flag_reason,
+        flag_category:  t.flag_category,
+        owner_name:     ownerMap.get(t.owner_user_id) ?? null,
+        owner_user_id:  t.owner_user_id,
+        alert_status:   attempt?.status ?? null,
+        alert_error:    attempt?.error ?? null,
+        alert_attempted_at: attempt?.attempted_at ?? null,
+      };
+    });
 
     return { transactions };
   });

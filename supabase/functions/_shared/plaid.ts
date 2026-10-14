@@ -9,7 +9,7 @@
 
 import { jwtVerify, importJWK } from "npm:jose@5";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { sendSms } from "./twilio.ts";
+import { formatFlagAlert, sendSms, type AlertNotifyStatus } from "./twilio.ts";
 
 // Switch to "https://production.plaid.com" for live
 export const PLAID_BASE =
@@ -421,7 +421,8 @@ async function addDetectedMerchant(
  *  1. Match merchant name against the flagged merchants table (case-insensitive substring)
  *  2. Mark matched rows as is_flagged in DB
  *  3. Send one Twilio SMS to the parent for each newly flagged transaction
- *  4. Insert a row in sms_logs
+ *  4. Insert a notification_attempts row (type sms). attempted_at is always set.
+ *  5. Insert a row in sms_logs
  *
  * Returns the number of transactions flagged.
  */
@@ -479,11 +480,15 @@ export async function flagAndNotify(
 
   if (!txns.length) return 0;
 
-  // Look up parent phone once (only needed if there are flagged transactions)
-  let parentPhone: string | null = null;
-  let parentDbId: string | null  = parentId;
+  const parentDbId: string | null = parentId;
 
-  const newlyFlagged: Array<{ id: string; name: string; amount: number; reason: string }> = [];
+  const newlyFlagged: Array<{
+    id: string;
+    name: string;
+    amount: number;
+    category: string;
+    ownerId: string | null;
+  }> = [];
 
   for (const txn of txns) {
     console.log(`[flag] txn=${txn.id}`, JSON.stringify({
@@ -561,10 +566,11 @@ export async function flagAndNotify(
     }
 
     newlyFlagged.push({
-      id:     txn.id,
-      name:   txn.merchant_name || txn.name || "Unknown merchant",
-      amount: txn.amount,
-      reason: flagReason,
+      id:       txn.id,
+      name:     txn.merchant_name || txn.name || "Unknown merchant",
+      amount:   txn.amount,
+      category: flagCategory,
+      ownerId:  txn.owner_user_id,
     });
   }
 
@@ -574,48 +580,110 @@ export async function flagAndNotify(
     parent_found: !!parentDbId,
   }));
 
-  if (!newlyFlagged.length || !parentDbId) return newlyFlagged.length;
+  if (!newlyFlagged.length) return 0;
 
-  // Fetch parent phone + opt-out status (only once)
-  const { data: parent } = await supabase
-    .from("users")
-    .select("phone, sms_opted_out")
-    .eq("id", parentDbId)
-    .maybeSingle();
-  const parentData = parent as { phone?: string | null; sms_opted_out?: boolean } | null;
-  parentPhone = parentData?.phone ?? null;
+  if (!parentDbId) {
+    for (const txn of newlyFlagged) {
+      await recordFlagAlert(supabase, {
+        transactionId: txn.id,
+        parentId: null,
+        phone: null,
+        message: null,
+        status: "skipped",
+        error: "No parent linked to this account",
+        twilioSid: null,
+      });
+    }
+    return newlyFlagged.length;
+  }
+
+  // Fetch parent phone + opt-out status, and the account holder's name for the text.
+  const ownerIds = [...new Set(newlyFlagged.map((t) => t.ownerId).filter((id): id is string => !!id))];
+  const [parentRes, ownerRes] = await Promise.all([
+    supabase.from("users").select("phone, sms_opted_out").eq("id", parentDbId).maybeSingle(),
+    ownerIds.length
+      ? supabase.from("users").select("id, name").in("id", ownerIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string | null }> }),
+  ]);
+  const parentData = parentRes.data as { phone?: string | null; sms_opted_out?: boolean } | null;
+  const parentPhone = parentData?.phone ?? null;
   const smsOptedOut = parentData?.sms_opted_out ?? false;
+  const nameById = new Map(
+    ((ownerRes.data ?? []) as Array<{ id: string; name: string | null }>).map((u) => [u.id, u.name]),
+  );
 
-  // Send SMS + log for each flagged transaction
   for (const txn of newlyFlagged) {
-    const msg =
-      `Buffr Alert ⚠️ ${txn.name} — $${Math.abs(txn.amount).toFixed(2)} flagged (${txn.reason}). Check your Buffr dashboard. Msg & data rates may apply. Reply STOP to opt out.`;
+    const msg = formatFlagAlert({
+      merchant: txn.name,
+      amount: txn.amount,
+      category: txn.category,
+      childName: txn.ownerId ? nameById.get(txn.ownerId) : null,
+    });
 
-    let status = "pending";
-    let twilioSid: string | undefined;
+    let status: AlertNotifyStatus = "skipped";
+    let error: string | null = "No phone number on file";
+    let twilioSid: string | null = null;
 
-    if (parentPhone && !smsOptedOut) {
+    if (smsOptedOut) {
+      status = "opted_out";
+      error = "Parent opted out";
+    } else if (parentPhone) {
       const result = await sendSms(parentPhone, msg);
-      status    = result.success ? "delivered" : "failed";
-      twilioSid = result.sid;
-      console.log(`[sms] txn=${txn.id}`, JSON.stringify({
-        status,
-        sid: twilioSid ?? null,
-      }));
-    } else {
-      const reason = !parentPhone ? "no_phone" : "opted_out";
-      console.log(`[sms] skipped txn=${txn.id}`, JSON.stringify({ reason }));
+      twilioSid = result.sid ?? null;
+      if (result.success) {
+        status = "sent";
+        error = null;
+      } else {
+        status = "failed";
+        error = result.error ?? "SMS send failed";
+      }
     }
 
-    await supabase.from("sms_logs").insert({
-      parent_id:      parentDbId,
-      transaction_id: txn.id,
-      phone:          parentPhone ?? "unknown",
-      message:        msg,
+    console.log(`[sms] txn=${txn.id}`, JSON.stringify({ status, sid: twilioSid }));
+    await recordFlagAlert(supabase, {
+      transactionId: txn.id,
+      parentId: parentDbId,
+      phone: parentPhone,
+      message: msg,
       status,
-      twilio_sid:     twilioSid ?? null,
+      error,
+      twilioSid,
     });
   }
 
   return newlyFlagged.length;
+}
+
+async function recordFlagAlert(
+  supabase: SupabaseClient,
+  row: {
+    transactionId: string;
+    parentId: string | null;
+    phone: string | null;
+    message: string | null;
+    status: AlertNotifyStatus;
+    error: string | null;
+    twilioSid: string | null;
+  },
+): Promise<void> {
+  const { error: attemptError } = await supabase.from("notification_attempts").insert({
+    transaction_id: row.transactionId,
+    type: "sms",
+    status: row.status,
+    attempted_at: new Date().toISOString(),
+    error: row.status === "sent" ? null : (row.error ?? "Alert not sent").slice(0, 200),
+  });
+  if (attemptError) console.error("[flag] notification attempt error:", attemptError.message);
+
+  if (!row.parentId || !row.message) return;
+
+  const { error: logError } = await supabase.from("sms_logs").insert({
+    parent_id: row.parentId,
+    transaction_id: row.transactionId,
+    phone: row.phone ?? "unknown",
+    message: row.message,
+    status: row.status,
+    twilio_sid: row.twilioSid,
+  });
+  if (logError) console.error("[flag] sms log error:", logError.message);
 }

@@ -14,8 +14,8 @@ async function getToken() {
 }
 
 function statusVariant(status: string) {
-  if (status === "delivered") return "bg-success/10 text-success border border-success/20";
-  if (status === "failed")    return "bg-destructive/10 text-destructive border border-destructive/20";
+  if (status === "sent" || status === "delivered") return "bg-success/10 text-success border border-success/20";
+  if (status === "failed") return "bg-destructive/10 text-destructive border border-destructive/20";
   return "bg-warning/15 text-warning-foreground border border-warning/30";
 }
 

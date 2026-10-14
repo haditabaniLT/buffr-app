@@ -206,7 +206,7 @@ function AdminReports() {
                   {[
                     { label: "Delivered", value: stats.smsDelivered, cls: "bg-green-500" },
                     { label: "Failed",    value: stats.smsFailed,    cls: "bg-red-500" },
-                    { label: "Pending",   value: stats.smsSent - stats.smsDelivered - stats.smsFailed, cls: "bg-yellow-400" },
+                    { label: "Not sent",  value: stats.smsSent - stats.smsDelivered - stats.smsFailed, cls: "bg-yellow-400" },
                   ].map((row) => (
                     <div key={row.label}>
                       <div className="flex justify-between text-sm mb-1">
