@@ -242,6 +242,44 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_attempts: {
+        Row: {
+          attempted_at: string
+          created_at: string
+          error: string | null
+          id: string
+          status: Database["public"]["Enums"]["notification_status"]
+          transaction_id: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Insert: {
+          attempted_at: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status: Database["public"]["Enums"]["notification_status"]
+          transaction_id: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Update: {
+          attempted_at?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["notification_status"]
+          transaction_id?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_attempts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string
@@ -560,6 +598,8 @@ export type Database = {
         | "suspicious_marketplace"
         | "other_risk"
       invitation_status: "pending" | "accepted" | "expired"
+      notification_status: "sent" | "failed" | "skipped" | "opted_out"
+      notification_type: "sms"
       risk_level: "low" | "medium" | "high"
       user_status: "active" | "suspended" | "blocked"
     }

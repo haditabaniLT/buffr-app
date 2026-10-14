@@ -1,5 +1,6 @@
 import { createParentServerFn } from "@/lib/server/parent/server-fn";
 import { withRetry } from "@/lib/server-helpers";
+import { formatFlagAlert, sendSms, type AlertNotifyStatus } from "@/lib/server/twilio";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const PLAID_BASE =
@@ -520,23 +521,55 @@ async function syncAndStoreFlagged(
 
         if (insErr) { console.error("[sync] insert error:", insErr.message); continue; }
 
-        // Send SMS alert — skip if parent has opted out via STOP
-        // 10DLC requirement: every message must include opt-out instruction
-        const msgBody = `Buffr Alert: ${txn.merchant_name || txn.name} — $${Math.abs(txn.amount).toFixed(2)} flagged (${flagReason}). View your dashboard for details. Msg&data rates may apply. Reply STOP to opt out.`;
-        let smsStatus = "pending", twilioSid: string | null = null;
-        if (parentPhone && !smsOptedOut) {
-          const r = await sendTwilioSms(parentPhone, msgBody);
-          smsStatus = r.success ? "delivered" : "failed";
-          twilioSid = r.sid ?? null;
-        } else if (smsOptedOut) {
-          smsStatus = "opted_out";
+        const { data: alreadySent } = await supabaseAdmin
+          .from("notification_attempts")
+          .select("id")
+          .eq("transaction_id", txn.transaction_id)
+          .eq("type", "sms")
+          .eq("status", "sent")
+          .limit(1)
+          .maybeSingle();
+        if (alreadySent) {
+          totalFlagged++;
+          continue;
         }
-        const msg = msgBody;
-        await supabaseAdmin.from("sms_logs").insert({
+
+        const msgBody = formatFlagAlert({
+          merchant: txn.merchant_name || txn.name || "Unknown merchant",
+          amount: txn.amount,
+          category: flagCategory,
+        });
+        let smsStatus: AlertNotifyStatus = "skipped";
+        let notifyError: string | null = "No phone number on file";
+        let twilioSid: string | null = null;
+        if (smsOptedOut) {
+          smsStatus = "opted_out";
+          notifyError = "Parent opted out";
+        } else if (parentPhone) {
+          const r = await sendSms(parentPhone, msgBody);
+          twilioSid = r.sid ?? null;
+          if (r.success) {
+            smsStatus = "sent";
+            notifyError = null;
+          } else {
+            smsStatus = "failed";
+            notifyError = r.error ?? "SMS send failed";
+          }
+        }
+        const { error: attemptErr } = await supabaseAdmin.from("notification_attempts").insert({
+          transaction_id: txn.transaction_id,
+          type: "sms",
+          status: smsStatus,
+          attempted_at: new Date().toISOString(),
+          error: smsStatus === "sent" ? null : (notifyError ?? "Alert not sent").slice(0, 200),
+        });
+        if (attemptErr) console.error("[sync] notification attempt error:", attemptErr.message);
+        const { error: logErr } = await supabaseAdmin.from("sms_logs").insert({
           parent_id: parentId, transaction_id: txn.transaction_id,
-          phone: parentPhone || "unknown", message: msg,
+          phone: parentPhone || "unknown", message: msgBody,
           status: smsStatus, twilio_sid: twilioSid,
         });
+        if (logErr) console.error("[sync] sms log error:", logErr.message);
 
         totalFlagged++;
         console.log(`[sync] flagged: ${txn.merchant_name || txn.name} $${txn.amount}`);
@@ -610,25 +643,3 @@ async function initCursor(
   return page.next_cursor ?? "";
 }
 
-async function sendTwilioSms(to: string, body: string) {
-  const sid   = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from  = process.env.TWILIO_FROM_NUMBER;
-  if (!sid || !token || !from) {
-    console.warn("[twilio] Not configured — SMS skipped.");
-    return { success: false };
-  }
-  const toNorm   = to.startsWith("+")   ? to   : `+1${to.replace(/\D/g, "")}`;
-  const fromNorm = from.startsWith("+") ? from : `+1${from.replace(/\D/g, "")}`;
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
-    },
-    body: new URLSearchParams({ To: toNorm, From: fromNorm, Body: body }).toString(),
-  });
-  const data: any = await res.json();
-  if (!res.ok) { console.error("[twilio] error:", data); return { success: false }; }
-  return { success: true, sid: data.sid as string };
-}

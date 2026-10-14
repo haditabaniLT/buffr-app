@@ -22,6 +22,14 @@ async function getToken() {
   return (await supabase.auth.getSession()).data.session?.access_token ?? null;
 }
 
+function alertBadge(status: string | null) {
+  if (status === "sent") return { label: "Notified", className: "bg-success/10 text-success border border-success/20" };
+  if (status === "failed") return { label: "Failed", className: "bg-destructive/10 text-destructive border border-destructive/20" };
+  if (status === "opted_out") return { label: "Opted out", className: "bg-warning/15 text-warning-foreground border border-warning/30" };
+  if (status === "skipped") return { label: "Not sent", className: "bg-warning/15 text-warning-foreground border border-warning/30" };
+  return { label: "Pending", className: "bg-muted text-muted-foreground border" };
+}
+
 function AdminMonitoring() {
   const listFn = useServerFn(adminListFlaggedTransactions);
   const [transactions, setTransactions] = useState<AdminFlaggedTxRow[]>([]);
@@ -69,18 +77,21 @@ function AdminMonitoring() {
                 <TableHead>Category</TableHead>
                 <TableHead>Risk signal</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Parent alert</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                     No flagged transactions yet.
                   </TableCell>
                 </TableRow>
               )}
-              {transactions.map((t) => (
+              {transactions.map((t) => {
+                const alert = alertBadge(t.alert_status);
+                return (
                 <TableRow key={t.id}>
                   <TableCell className="font-medium">
                     {t.merchant_name ?? t.name ?? "Unknown"}
@@ -101,11 +112,17 @@ function AdminMonitoring() {
                   <TableCell className="text-muted-foreground">
                     {new Date(t.date).toLocaleDateString()}
                   </TableCell>
+                  <TableCell>
+                    <Badge className={alert.className} title={t.alert_error ?? undefined}>
+                      {alert.label}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right tabular-nums text-destructive font-medium">
                     ${t.amount.toFixed(2)}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

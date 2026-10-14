@@ -109,7 +109,7 @@ export const adminGetReports = createAdminServerFn()
 
     // ── SMS stats ─────────────────────────────────────────────────────────────
     const smsLogs: any[] = smsRes.data ?? [];
-    const smsDelivered = smsLogs.filter((s) => s.status === "delivered").length;
+    const smsDelivered = smsLogs.filter((s) => s.status === "sent" || s.status === "delivered").length;
     const smsFailed    = smsLogs.filter((s) => s.status === "failed").length;
 
     const stats: ReportStats = {
