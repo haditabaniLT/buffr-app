@@ -21,8 +21,6 @@ dist-ssr
 .dev.vars
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
@@ -37,3 +35,4 @@ temp_interactive_push.bat
 # Local Netlify folder
 .netlify
 branch_structure.json
+.gitignore
